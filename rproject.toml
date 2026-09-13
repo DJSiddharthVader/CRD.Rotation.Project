@@ -8,12 +8,16 @@ r_version = "4.5"
 # The alias is only used in this file if you want to specifically require a dependency to come from a certain repository.
 # Example: { alias = "PPM", url = "https://packagemanager.posit.co/cran/latest" },
 repositories = [
-    {alias = "P3M-manylinux", url = "https://packagemanager.posit.co/cran/latest"},
-    {alias = "CRAN", url = "https://cloud.r-project.org/"},
-    { alias = "BioCsoft", url = "https://bioconductor.org/packages/3.23/bioc" },
-    { alias = "BioCann", url = "https://bioconductor.org/packages/3.23/data/annotation" },
-    { alias = "BioCexp", url = "https://bioconductor.org/packages/3.23/data/experiment" },
-    { alias = "BioCworkflows", url = "https://bioconductor.org/packages/3.23/workflows" }
+    { alias = "P3M-manylinux",    url = "https://packagemanager.posit.co/cran/latest"},
+    { alias = "CRAN",             url = "https://cloud.r-project.org/"},
+    # { alias = "BioCsoft.23",      url = "https://bioconductor.org/packages/3.23/bioc" },
+    # { alias = "BioCann.23",       url = "https://bioconductor.org/packages/3.23/data/annotation" },
+    # { alias = "BioCexp.23",       url = "https://bioconductor.org/packages/3.23/data/experiment" },
+    # { alias = "BioCworkflows.23", url = "https://bioconductor.org/packages/3.23/workflows" }
+    { alias = "BioCsoft.22",      url = "https://bioconductor.org/packages/3.22/bioc" },
+    { alias = "BioCann.22",       url = "https://bioconductor.org/packages/3.22/data/annotation" },
+    { alias = "BioCexp.22",       url = "https://bioconductor.org/packages/3.22/data/experiment" },
+    { alias = "BioCworkflows.22", url = "https://bioconductor.org/packages/3.22/workflows" }
 ]
 
 # A list of packages to install and any additional configuration
@@ -22,11 +26,16 @@ repositories = [
     # {name = "dplyr", repository = "CRAN"},
     # {name = "dplyr", git = "https://github.com/tidyverse/dplyr.git", tag = "v1.1.4"},
 dependencies = [
+    "variancePartition",
     { name = "decorate", git = "https://github.com/GabrielHoffman/decorate.git", branch = "master" },
-    "magrittr",
     "tidyverse",
+    "magrittr",
+    "sva",
     "tictoc",
+    "GenomicRanges",
     "glue",
-    "ggplot2",
     "here",
+    "ggplot2",
+    "dplyr",
+    "edgeR",
 ]

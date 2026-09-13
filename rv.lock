@@ -5,8 +5,8 @@ r_version = "4.5"
 
 [[packages]]
 name = "AnnotationDbi"
-version = "1.74.0"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "1.72.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     { name = "BiocGenerics", requirement = "(>= 0.29.2)" },
@@ -27,8 +27,8 @@ dependencies = []
 
 [[packages]]
 name = "Biobase"
-version = "2.72.0"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "2.70.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     { name = "BiocGenerics", requirement = "(>= 0.27.1)" },
@@ -36,8 +36,8 @@ dependencies = [
 
 [[packages]]
 name = "BiocGenerics"
-version = "0.58.1"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "0.56.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     "generics",
@@ -45,8 +45,8 @@ dependencies = [
 
 [[packages]]
 name = "BiocIO"
-version = "1.22.0"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "1.20.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     "BiocGenerics",
@@ -55,8 +55,8 @@ dependencies = [
 
 [[packages]]
 name = "BiocParallel"
-version = "1.46.0"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "1.44.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     "futile.logger",
@@ -68,8 +68,8 @@ dependencies = [
 
 [[packages]]
 name = "Biostrings"
-version = "2.80.2"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "2.78.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     { name = "BiocGenerics", requirement = "(>= 0.37.0)" },
@@ -99,8 +99,8 @@ dependencies = []
 
 [[packages]]
 name = "DelayedArray"
-version = "0.38.2"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "0.36.1"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     "Matrix",
@@ -114,11 +114,22 @@ dependencies = [
 
 [[packages]]
 name = "Deriv"
-version = "4.3.0"
+version = "4.3.5"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
 force_source = false
 dependencies = [
     "Rcpp",
+]
+
+[[packages]]
+name = "EnvStats"
+version = "3.1.0"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    "MASS",
+    "ggplot2",
+    "nortest",
 ]
 
 [[packages]]
@@ -158,8 +169,8 @@ dependencies = []
 
 [[packages]]
 name = "GenomeInfoDb"
-version = "1.48.0"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "1.46.2"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     { name = "BiocGenerics", requirement = "(>= 0.53.2)" },
@@ -171,8 +182,8 @@ dependencies = [
 
 [[packages]]
 name = "GenomicAlignments"
-version = "1.48.0"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "1.46.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     { name = "BiocGenerics", requirement = "(>= 0.37.0)" },
@@ -195,8 +206,8 @@ dependencies = [
 
 [[packages]]
 name = "GenomicFeatures"
-version = "1.64.0"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "1.62.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     { name = "BiocGenerics", requirement = "(>= 0.51.2)" },
@@ -213,8 +224,8 @@ dependencies = [
 
 [[packages]]
 name = "GenomicRanges"
-version = "1.64.0"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "1.62.1"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     { name = "BiocGenerics", requirement = "(>= 0.53.2)" },
@@ -225,8 +236,8 @@ dependencies = [
 
 [[packages]]
 name = "IRanges"
-version = "2.46.0"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "2.44.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     { name = "BiocGenerics", requirement = "(>= 0.53.2)" },
@@ -235,8 +246,8 @@ dependencies = [
 
 [[packages]]
 name = "KEGGREST"
-version = "1.52.2"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "1.50.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     "httr",
@@ -269,8 +280,8 @@ dependencies = [
 
 [[packages]]
 name = "MatrixGenerics"
-version = "1.24.0"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "1.22.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     { name = "matrixStats", requirement = "(>= 1.4.1)" },
@@ -344,7 +355,7 @@ dependencies = []
 
 [[packages]]
 name = "RcppArmadillo"
-version = "15.4.2-1"
+version = "15.6.0-1"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
 force_source = false
 dependencies = [
@@ -370,16 +381,23 @@ dependencies = [
 ]
 
 [[packages]]
+name = "RhpcBLASctl"
+version = "0.23-42"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = []
+
+[[packages]]
 name = "Rhtslib"
-version = "3.8.0"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "3.6.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = []
 
 [[packages]]
 name = "Rsamtools"
-version = "2.28.0"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "2.26.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     "Seqinfo",
@@ -396,8 +414,8 @@ dependencies = [
 
 [[packages]]
 name = "S4Arrays"
-version = "1.12.0"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "1.10.1"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     "Matrix",
@@ -409,8 +427,8 @@ dependencies = [
 
 [[packages]]
 name = "S4Vectors"
-version = "0.50.2"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "0.48.1"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     { name = "BiocGenerics", requirement = "(>= 0.53.2)" },
@@ -425,8 +443,8 @@ dependencies = []
 
 [[packages]]
 name = "Seqinfo"
-version = "1.2.0"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "1.0.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     "BiocGenerics",
@@ -436,15 +454,15 @@ dependencies = [
 
 [[packages]]
 name = "SparseArray"
-version = "1.12.2"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "1.10.10"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     "Matrix",
     { name = "BiocGenerics", requirement = "(>= 0.43.1)" },
     { name = "MatrixGenerics", requirement = "(>= 1.11.1)" },
     { name = "S4Vectors", requirement = "(>= 0.43.2)" },
-    { name = "S4Arrays", requirement = "(>= 1.11.1)" },
+    { name = "S4Arrays", requirement = "(>= 1.10.1)" },
     "matrixStats",
     "IRanges",
     "XVector",
@@ -459,8 +477,8 @@ dependencies = []
 
 [[packages]]
 name = "SummarizedExperiment"
-version = "1.42.0"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "1.40.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     { name = "MatrixGenerics", requirement = "(>= 1.1.3)" },
@@ -477,8 +495,8 @@ dependencies = [
 
 [[packages]]
 name = "UCSC.utils"
-version = "1.8.0"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "1.6.1"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     "httr",
@@ -495,8 +513,8 @@ dependencies = []
 
 [[packages]]
 name = "XVector"
-version = "0.52.0"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "0.50.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     { name = "BiocGenerics", requirement = "(>= 0.37.0)" },
@@ -529,6 +547,28 @@ dependencies = [
     "rlang",
     "RcppArmadillo",
 ]
+
+[[packages]]
+name = "annotate"
+version = "1.88.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
+force_source = false
+dependencies = [
+    { name = "AnnotationDbi", requirement = "(>= 1.27.5)" },
+    "XML",
+    "Biobase",
+    "DBI",
+    "xtable",
+    { name = "BiocGenerics", requirement = "(>= 0.13.8)" },
+    "httr",
+]
+
+[[packages]]
+name = "aod"
+version = "1.3.3"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = []
 
 [[packages]]
 name = "askpass"
@@ -632,6 +672,15 @@ dependencies = [
 ]
 
 [[packages]]
+name = "caTools"
+version = "1.18.4"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    "bitops",
+]
+
+[[packages]]
 name = "cachem"
 version = "1.1.0"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
@@ -699,8 +748,8 @@ dependencies = [
 
 [[packages]]
 name = "cigarillo"
-version = "1.2.1"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "1.0.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     "BiocGenerics",
@@ -774,6 +823,13 @@ dependencies = [
     "memoise",
     { name = "rlang", requirement = "(>= 1.0.0)" },
 ]
+
+[[packages]]
+name = "corpcor"
+version = "1.6.10"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = []
 
 [[packages]]
 name = "cowplot"
@@ -980,8 +1036,25 @@ dependencies = [
 ]
 
 [[packages]]
+name = "edgeR"
+version = "4.8.2"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
+force_source = false
+dependencies = [
+    { name = "limma", requirement = "(>= 3.63.6)" },
+    "locfit",
+]
+
+[[packages]]
 name = "evaluate"
 version = "1.0.5"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = []
+
+[[packages]]
+name = "fANCOVA"
+version = "0.6-1"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
 force_source = false
 dependencies = []
@@ -1112,6 +1185,19 @@ dependencies = [
 ]
 
 [[packages]]
+name = "genefilter"
+version = "1.92.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
+force_source = false
+dependencies = [
+    { name = "MatrixGenerics", requirement = "(>= 1.11.1)" },
+    "AnnotationDbi",
+    "annotate",
+    "Biobase",
+    "survival",
+]
+
+[[packages]]
 name = "generics"
 version = "0.1.4"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
@@ -1218,6 +1304,17 @@ dependencies = [
 ]
 
 [[packages]]
+name = "gplots"
+version = "3.3.0"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    "gtools",
+    "caTools",
+    "KernSmooth",
+]
+
+[[packages]]
 name = "gridExtra"
 version = "2.3.1"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
@@ -1237,6 +1334,13 @@ dependencies = [
     "lifecycle",
     { name = "rlang", requirement = "(>= 1.1.0)" },
 ]
+
+[[packages]]
+name = "gtools"
+version = "3.9.5"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = []
 
 [[packages]]
 name = "haven"
@@ -1387,7 +1491,7 @@ dependencies = []
 
 [[packages]]
 name = "knitr"
-version = "1.51"
+version = "1.52"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
 force_source = false
 dependencies = [
@@ -1432,8 +1536,8 @@ dependencies = [
 
 [[packages]]
 name = "limma"
-version = "3.68.5"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "3.66.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     "statmod",
@@ -1459,12 +1563,34 @@ dependencies = [
 ]
 
 [[packages]]
+name = "lmerTest"
+version = "3.2-1"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    { name = "lme4", requirement = "(>= 1.1-10)" },
+    "numDeriv",
+    "MASS",
+    "ggplot2",
+    "reformulas",
+]
+
+[[packages]]
 name = "lmtest"
 version = "0.9-40"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
 force_source = false
 dependencies = [
     "zoo",
+]
+
+[[packages]]
+name = "locfit"
+version = "1.5-9.12"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    "lattice",
 ]
 
 [[packages]]
@@ -1551,6 +1677,13 @@ dependencies = [
 ]
 
 [[packages]]
+name = "mvtnorm"
+version = "1.4-2"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = []
+
+[[packages]]
 name = "nlme"
 version = "3.1-168"
 source = { builtin = true }
@@ -1570,6 +1703,13 @@ dependencies = []
 name = "nnet"
 version = "7.3-20"
 source = { builtin = true }
+force_source = false
+dependencies = []
+
+[[packages]]
+name = "nortest"
+version = "1.0-4"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
 force_source = false
 dependencies = []
 
@@ -1826,6 +1966,21 @@ dependencies = [
 ]
 
 [[packages]]
+name = "remaCor"
+version = "0.0.20"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    "ggplot2",
+    "mvtnorm",
+    "reshape2",
+    "Rcpp",
+    "EnvStats",
+    "Rdpack",
+    "RcppArmadillo",
+]
+
+[[packages]]
 name = "rematch"
 version = "2.0.0"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
@@ -1960,8 +2115,8 @@ dependencies = []
 
 [[packages]]
 name = "rtracklayer"
-version = "1.72.0"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "1.70.1"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     { name = "GenomicRanges", requirement = "(>= 1.37.2)" },
@@ -1999,7 +2154,7 @@ dependencies = [
 
 [[packages]]
 name = "s2"
-version = "1.1.11"
+version = "1.1.12"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
 force_source = false
 dependencies = [
@@ -2059,7 +2214,7 @@ dependencies = [
 
 [[packages]]
 name = "sf"
-version = "1.1-2"
+version = "1.1-3"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
 force_source = false
 dependencies = [
@@ -2097,8 +2252,8 @@ dependencies = [
 
 [[packages]]
 name = "sparseMatrixStats"
-version = "1.24.0"
-source = { repository = "https://bioconductor.org/packages/3.23/bioc" }
+version = "1.22.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
 force_source = false
 dependencies = [
     { name = "MatrixGenerics", requirement = "(>= 1.5.3)" },
@@ -2159,6 +2314,20 @@ source = { builtin = true }
 force_source = false
 dependencies = [
     "Matrix",
+]
+
+[[packages]]
+name = "sva"
+version = "3.58.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
+force_source = false
+dependencies = [
+    "mgcv",
+    "genefilter",
+    "BiocParallel",
+    "matrixStats",
+    "limma",
+    "edgeR",
 ]
 
 [[packages]]
@@ -2353,6 +2522,38 @@ force_source = false
 dependencies = []
 
 [[packages]]
+name = "variancePartition"
+version = "1.40.2"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
+force_source = false
+dependencies = [
+    "ggplot2",
+    { name = "limma", requirement = "(>= 3.62.2)" },
+    "BiocParallel",
+    "MASS",
+    { name = "pbkrtest", requirement = "(>= 0.4-4)" },
+    "lmerTest",
+    { name = "Matrix", requirement = "(>= 1.4.0)" },
+    "iterators",
+    "gplots",
+    "corpcor",
+    "reformulas",
+    "matrixStats",
+    "RhpcBLASctl",
+    "reformulas",
+    "reshape2",
+    "gtools",
+    { name = "remaCor", requirement = "(>= 0.0.15)" },
+    "fANCOVA",
+    "aod",
+    "scales",
+    "Rdpack",
+    "rlang",
+    { name = "lme4", requirement = "(>= 2.0-1)" },
+    "Biobase",
+]
+
+[[packages]]
 name = "vctrs"
 version = "0.7.3"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
@@ -2447,6 +2648,13 @@ dependencies = [
     "cli",
     { name = "rlang", requirement = "(>= 1.1.0)" },
 ]
+
+[[packages]]
+name = "xtable"
+version = "1.8-8"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = []
 
 [[packages]]
 name = "yaml"
