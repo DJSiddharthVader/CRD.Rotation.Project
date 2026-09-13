@@ -1,2 +1,6 @@
 .Rprofile
 rv/
+/.here
+/all.sample.metadata.tsv
+/results/peak.SVs/CPM.cutoff_3CPM/residual.model_KeepDxAge
+/scripts/Rscripts_Processing_ATACseq_RK_6_12_26.R
