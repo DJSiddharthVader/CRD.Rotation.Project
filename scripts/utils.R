@@ -1,17 +1,15 @@
-#############################
+############################################################
 # Dependencies
-#############################
-library(tidyverse)
-library(magrittr)
-library(here)
-library(tictoc)
-library(glue)
-library(decorate)
-# library(optparse)
-# library(furrr)
-# library(plyranges)
-PROJECT_DIR <- here()
-source(file.path(PROJECT_DIR, 'scripts', 'locations.R'))
+############################################################
+suppressPackageStartupMessages({
+    library(tidyverse)
+    library(magrittr)
+    library(tictoc)
+    library(glue)
+    # library(optparse)
+    # library(furrr)
+    # library(plyranges)
+})
 
 #############################
 # Data Loading

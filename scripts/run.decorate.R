@@ -1,8 +1,13 @@
-#############################
+############################################################
 # Dependencies
-#############################
-PROJECT_DIR <- here()
-source(file.path(PROJECT_DIR, 'scripts', 'locations.R'))
+############################################################
+library(here)
+source(here('scripts', 'locations.R'))
+source(here('scripts', 'utils.R'))
+source(here('scripts', 'utils.decorate.R'))
+# load patient metadata
+sample.metadata <- load_sample_metadata()
+
 
 #############################
 # Run decorate
