@@ -69,6 +69,80 @@ check_cached_results <- function(
     }
 }
 
+parse_results_filelist <- function(
+    input_dir,
+    suffix,
+    pattern=NA,
+    param_delim='_',
+    filename.column.name='filename',
+    parse_filepath_to_columns=TRUE,
+    ...){
+    # !!NOTICE!!
+    # This will break if any parameter_dir name has a param_delim character in the name or value, 
+    # This shouldnt  break if the filename has a single param_delim character in it 
+    # i.e. min_resolution-0.45 is fine when param_delim='-'
+    #      min_resolution_0.45 is will break with any value for param_delim not '_'
+    suffix_pattern <- glue('*{suffix}$')
+    # List all results files that exist
+    input_dir %>% 
+    list.files(
+        pattern=suffix_pattern,
+        recursive=TRUE,
+        full.names=FALSE
+    ) %>% 
+    tibble(fileinfo=.) %>%
+    mutate(filepath=file.path(input_dir, fileinfo)) %>% 
+    {
+        if (is.na(pattern)) {
+            .
+        } else {
+            filter(., grepl(pattern, filepath))
+        }
+    } %>% 
+    # Extract param info from directory names into structured columns
+    {
+        if (parse_filepath_to_columns) {
+            separate_longer_delim(
+                .,
+                fileinfo,
+                delim='/'
+            ) %>%
+            mutate(
+                fileinfo=
+                    ifelse(
+                        grepl(suffix_pattern, fileinfo),
+                        paste(
+                            filename.column.name,
+                            fileinfo,
+                            sep=param_delim
+                        ) %>% 
+                        str_remove(suffix),
+                        fileinfo
+                    )
+            ) %>% 
+            separate_wider_delim(
+                fileinfo,
+                delim='_',
+                too_many="merge",  # in case filenames have delim inside
+                names=
+                    c(
+                        'Parameter',
+                        'Value'
+                    )
+            ) %>%
+            pivot_wider(
+                names_from=Parameter,
+                values_from=Value
+            )
+        } else {
+            .
+        }
+    } %>% 
+    # Fix column types based on content
+    readr::type_convert()
+}
+
+############################################################
 load_sample_metadata <- function(...){
     check_cached_results(
         ...,
