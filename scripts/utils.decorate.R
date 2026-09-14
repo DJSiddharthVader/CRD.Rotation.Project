@@ -119,3 +119,79 @@ list_all_SVs <- function(){
 }
 
 adjust_residuals_with_svs <- function(
+############################################################
+# Generate decorate clusters
+############################################################
+generate_peak_cluster_with_decorate <- function(
+    peak.residuals.mx,
+    peak.locations,
+    adjacentCount,
+    method.corr,
+    clusterMethod,
+    meanClusterSize,
+    jaccardCutoff,
+    filterMetric,
+    filterMetricCutoff,
+    cores,
+    ...){
+    # Evaluate hierarchical clustering
+    # adjacentCount is the number of adjacent peaks considered in correlation
+    # use Spearman correlation to reduce the effects of outliers
+    # peak.residuals.mx=peak.data$residuals; peak.locations=peak.data$locations;
+    tree.list <- 
+        peak.residuals.mx %>% 
+        runOrderedClusteringGenome( 
+            peak.locations,
+            adjacentCount=adjacentCount,
+            method.corr=method.corr
+        )
+    # tree.list %>% save_correlation_matrices(results_dir=results_dir)
+    # Choose cutoffs and return clusters using multiple values for meanClusterSize 
+    # Clusters corresponding to each parameter value are returned and then processed downstream
+    # By using multiple parameter values, epigenetic features are included in clusters 
+    # at different resolutions
+    all.tree.list.clusters <- 
+        tree.list %>% 
+        createClusters(
+            method=clusterMethod,
+            meanClusterSize=meanClusterSize
+        )
+    tree.scores <- 
+        tree.list %>% 
+        # scoreClusters(all.tree.list.clusters, BPPARAM=SnowParam(cores))
+        scoreClusters(all.tree.list.clusters)
+    # tree.list
+    # all.tree.list.clusters
+    scores.df <- 
+        tree.scores %>%
+        sapply(
+            FUN=as_tibble,
+            simplify=FALSE,
+            USE.NAMES=TRUE
+        ) %>% 
+        bind_rows(.id='meanClusterSize')
+
+    tree.scores$`10` %>% as_tibble()
+    filtered.tree.list.clusters <- 
+        tree.scores %>% 
+        retainClusters( 
+            metric=filterMetric,
+            cutoff=filterMetricCutoff
+        ) %>% 
+        # get retained clusters
+        filterClusters(all.tree.list.clusters, .) %>% 
+        # collapse redundant clusters
+        collapseClusters(
+            peak.locations,
+            jaccardCutoff=jaccardCutoff
+        )
+    # return all data
+    list(
+        tree.list=tree.list,
+        cluster.LEFs=,
+        all.clusters=all.tree.list.clusters,
+        filtered.clusters=
+    )
+}
+
+run_decorate_pipeline <- function(

@@ -129,59 +129,24 @@ list_all_ATAC_residual_sets <- function(){
     filter(str_detect(CPM.cutoff, 'CPM'))
 }
 
-#############################
-# decorate
-#############################
-run_decorate <- function(
-    resids.matrix,
-    resids.granges,
-    adjacentCount=500,
-    method.corr="spearman",
-    clusterMethod="meanClusterSize",
-    meanClusterSize=c(20, 30, 40, 50),
-    filterMetric="LEF",
-    filterMetricCutoff=0.15,
-    jaccardCutoff=0.9,
-    ...) {
-    # Evaluate hierarchical clustering
-    # adjacentCount is the number of adjacent peaks considered in correlation
-    # use Spearman correlation to reduce the effects of outliers
-    tree.list <- 
-        resids.matrix %>% 
-        runOrderedClusteringGenome( 
-            resids.granges,
-            adjacentCount=adjacentCount
-            method.corr=method.corr,
-        )
-    # Choose cutoffs and return clusters using multiple values for meanClusterSize 
-    # Clusters corresponding to each parameter value are returned 
-    # and then processed downstream
-    # By using multiple parameter values, epigenetic features are included in clusters 
-    # at different resolutions
-    tree.list.clusters <- 
-        tree.list %>% 
-        createClusters(
-            method=clusterMethod,
-            meanClusterSize=meanClusterSize
-        )
-    # Evaluate strength of correlation for each cluster
-    filtered.tree.list.clusters <- 
-        tree.list %>% 
-        scoreClusters(treeListClusters) %>% 
-        # Filter to retain only strong clusters
-        # If lead eigen value fraction (LEF) > 30% then keep clusters
-        # LEF is the fraction of variance explained by the first eigen-value
-        retainClusters( 
-            metric=filterMetric="LEF",
-            cutoff=filterMetricCutoff=0.15
-        ) %>% 
-        # get retained clusters
-        filterClusters(tree.list.clusters, .) %>% 
-        # collapse redundant clusters
-        collapseClusters(
-            resids.granges,
-            jaccardCutoff=jaccardCutoff
-        )
-    return(filtered.tree.list.clusters)
+list_all_ATAC_coordinates_sets <- function(){
+    RESIDUALS_DIR %>%
+    list.files(full.names=TRUE) %>%
+    tibble(coords.filepath=.) %>%
+    mutate(info=coords.filepath %>% basename()) %>% 
+    filter(str_detect(info, '^expObjNonLow_ATACseq_.*.RDs')) %>% 
+    mutate(info=info %>% str_remove('.RDs$')) %>% 
+    separate_wider_delim(
+        info,
+        delim='_',
+        names=c(NA, NA, 'dims', 'CPM.cutoff'),
+        too_few='align_start',
+        too_many='merge'
+    ) %>%
+    filter(str_detect(CPM.cutoff, 'CPM')) %>%
+    select(-c(dims))
+}
+
+############################################################
 }
 
