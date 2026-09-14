@@ -9,6 +9,86 @@ suppressPackageStartupMessages({
 })
 
 ############################################################
+# Input PreProcessing
+############################################################
+select_samples_to_include_for_decorate <- function(
+    sample.metadata,
+    AD.definition.column,
+    sample.strategy,
+    ...){
+    # AD.definition.column='AD_CERAD_withDLB'; sample.strategy='AD.Samples'
+    # AD.definition.column='AD_CERAD_withDLB'; sample.strategy='Control.Samples'
+    # AD.definition.column='AD_CERAD_withDLB'; sample.strategy='No.Others'
+    # AD.definition.column='AD_CERAD_withDLB'; sample.strategy='All.Samples'
+    # AD.definition.column='AD_CERAD_withDLB'; sample.strategy='Make.Error'
+    # decide which specific samples to select  based on inclusin criteria
+    filter_cmd <- 
+        if        (AD.definition.column == 'AD_CERAD_withDLB' & sample.strategy == 'Control.Samples') {
+            .  %>% dplyr::filter(!!sym(AD.definition.column) == 'Control')
+        } else if (AD.definition.column == 'AD_CERAD_withDLB' & sample.strategy == 'AD.Samples') {
+            .  %>% dplyr::filter(!!sym(AD.definition.column) == 'AD')
+        } else if (AD.definition.column == 'AD_CERAD_withDLB' & sample.strategy == 'No.Others') {
+            .  %>% dplyr::filter(!!sym(AD.definition.column) != 'Other')
+        } else if (AD.definition.column == 'Bradk_3levels' & sample.strategy == 'Control.Samples') {
+            .  %>% dplyr::filter(!!sym(AD.definition.column) == 'Braak_3to4')
+        } else if (AD.definition.column == 'Bradk_3levels' & sample.strategy == 'AD.Samples') {
+            .  %>% dplyr::filter(!!sym(AD.definition.column) == 'Braak5plus')
+        } else if (AD.definition.column == 'Bradk_3levels' & sample.strategy == 'No.Others') {
+            .  %>% dplyr::filter(!!sym(AD.definition.column) != 'BraakMax2')
+        } else if (sample.strategy == 'All.Samples') {
+            . %>% filter(!is.na(!!sym(AD.definition.column)))
+        } else {
+            stop(glue('sample inclusion criteria not implemented. you used {sample.strategy} to filter on the column {AD.definition.column}'))
+        }
+    # Now pull the Sample_IDs from the metadata for the selected samples
+    sample.metadata %>%
+    filter_cmd() %>% 
+    pull(SampleID)
+}
+
+pick_samples_to_use <- function(
+    residuals.filepath,
+    coords.filepath,
+    sample.metadata,
+    AD.definition.column,
+    sample.strategy,
+    ...){
+    # load coordinates of all ATAC features
+    peak.locations.gr <- 
+        coords.filepath %>% 
+        readRDS() %>% 
+        {.$genes} %>% 
+        as.data.frame() %>% 
+        makeGRangesFromDataFrame()
+        # select(seqnames, start, end)
+    # load residual ATAC matrix
+    peak.residuals.mx <- 
+        residuals.filepath %>% 
+        readRDS()
+    # Only keep common peaks
+    peaks.to.keep <- 
+        intersect(
+            names(peak.locations.gr),
+            rownames(peak.residuals.mx)
+        )
+    # select which samples to include when annotating CRDs 
+    samples.to.keep <- 
+        select_samples_to_include_for_decorate(
+            sample.metadata=sample.metadata,
+            AD.definition.column=AD.definition.column,
+            sample.strategy=sample.strategy
+        )
+    # Now make sure rows are compatible
+    # length(samples.to.keep); length(peaks.to.keep)
+    # peak.locations.gr <- peak.locations.gr[peaks.to.keep, ]
+    # peak.residuals.mx <- peak.residuals.mx[peaks.to.keep, samples.to.keep]
+    list(
+        residuals=peak.residuals.mx[peaks.to.keep, samples.to.keep],
+        locations=peak.locations.gr[peaks.to.keep, ]
+    )
+}
+
+############################################################
 # Run SVA on peak residuals
 ############################################################
 run_sva <- function(
