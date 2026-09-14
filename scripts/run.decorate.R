@@ -78,17 +78,47 @@ all.input.and.parameter.combinations.df %>%
     )
 # list_all_SVs()
 
-all.residual.sets.df %>%
+############################################################
+# Run decorate for each parameter combination
+############################################################
+# For every residual matrix + sample strategy + hyper-param option 
+# use decorate to annotate a set of CRDs
+# all.input.and.parameter.combinations.df
+all.input.and.parameter.combinations.df %>% 
+    # Define all relevant arguments/analysis decisions/parameters to decorate in the results filepath
+    # explicity, this also allows for easier parsing of the results, associating each results
+    # file with this metadata automatically in R
+    mutate(
+        results_dir=
+            file.path(
+                CRD_RESULTS_DIR,
+                glue('CPM.cutoff_{CPM.cutoff}'),
+                glue('residual.model_{residual.model}'),
+                glue('sample.strategy_{sample.strategy}'),
+                glue('adjacentCount_{adjacentCount}'),
+                glue('method.corr_{method.corr}'),
+                glue('clusterMethod_{clusterMethod}'),
+                glue('filterMetric_{filterMetric}'),
+                glue('filterMetricCutoff_{filterMetricCutoff}'),
+                glue('jaccardCutoff_{jaccardCutoff}')
+            )
+    ) %>% 
+        {.} -> tmp; tmp
+        # tmp %>% 
     pmap(
         .l=.,
-        .f=run_decorate,
-        resids.matrix,
-        resids.granges,
-        adjacentCount=500,
-        method.corr="spearman",
-        clusterMethod="meanClusterSize",
-        meanClusterSize=c(20, 30, 40, 50),
-        filterMetric="LEF",
-        filterMetricCutoff=0.15,
-        jaccardCutoff=0.9
+        .f=generate_decorate_peak_clusters,
+        # .f=check_cached_results,
+        # results_fnc=generate_decorate_peak_clusters,
+        sample.metadata=sample.metadata
     ) 
+
+############################################################
+# Load decorate CRD annotations
+############################################################
+decorate.results.df <- 
+    list_all_decorate_peak_clusters() %>% 
+    filter(cluster.scope == 'filtered.clusters')
+# decorate.results.df %>% 
+#     count(CPM.cutoff, residual.model, sample.strategy, meanClusterSize, cluster.scope)
+# decorate.results.df$filepath[[1]] %>% read_tsv() %>% count(chr, CRDID) %>% count(chr)
