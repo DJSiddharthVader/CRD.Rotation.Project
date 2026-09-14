@@ -11,9 +11,9 @@ suppressPackageStartupMessages({
     # library(plyranges)
 })
 
-#############################
-# Data Loading
-#############################
+############################################################
+# Utilities
+############################################################
 check_cached_results <- function(
     results_file,
     force_redo=FALSE,
@@ -29,7 +29,6 @@ check_cached_results <- function(
         results <- results_fnc(...)
         return_data <- TRUE
     } else {
-        # Set read/write functions based on filetype
         output.filetype <- results_file %>% str_extract('\\.[^\\.]*$') 
         if (!silence) { message(output.filetype) }
         if (output.filetype == '.rds') {
@@ -143,6 +142,8 @@ parse_results_filelist <- function(
 }
 
 ############################################################
+# Loading ATAC Data
+############################################################
 load_sample_metadata <- function(...){
     check_cached_results(
         ...,
@@ -154,7 +155,8 @@ load_sample_metadata <- function(...){
                 rownames_to_column('SampleID') %>% 
                 as_tibble() %>% 
                 select(
-                    Sample_ID,
+                    SampleID,
+                    # Sample_ID,
                     Person_ID,
                     sex,
                     age,
@@ -190,13 +192,14 @@ load_sample_metadata <- function(...){
 list_all_ATAC_residual_sets <- function(){
     RESIDUALS_DIR %>%
     list.files(full.names=TRUE) %>%
-    tibble(filepath=.) %>%
-    mutate(info=filepath %>% basename()) %>% 
+    tibble(residuals.filepath=.) %>%
+    mutate(info=residuals.filepath %>% basename()) %>% 
     filter(str_detect(info, '^Resid_.*.RDs')) %>% 
+    mutate(info=info %>% str_remove('.RDs$')) %>% 
     separate_wider_delim(
         info,
         delim='_',
-        names=c(NA, 'model', NA, NA, 'CPM.cutoff', NA, NA),
+        names=c(NA, 'residual.model', NA, NA, 'CPM.cutoff', NA, NA),
         too_few='align_start',
         too_many='merge'
     ) %>%
@@ -219,8 +222,5 @@ list_all_ATAC_coordinates_sets <- function(){
     ) %>%
     filter(str_detect(CPM.cutoff, 'CPM')) %>%
     select(-c(dims))
-}
-
-############################################################
 }
 
