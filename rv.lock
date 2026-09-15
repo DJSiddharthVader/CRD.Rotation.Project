@@ -91,6 +91,18 @@ dependencies = [
 ]
 
 [[packages]]
+name = "ComplexUpset"
+version = "1.3.3"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    "ggplot2",
+    "patchwork",
+    "scales",
+    "colorspace",
+]
+
+[[packages]]
 name = "DBI"
 version = "1.3.0"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
@@ -832,6 +844,13 @@ force_source = false
 dependencies = []
 
 [[packages]]
+name = "corrplot"
+version = "0.95"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = []
+
+[[packages]]
 name = "cowplot"
 version = "1.2.0"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
@@ -1150,6 +1169,19 @@ force_source = false
 dependencies = []
 
 [[packages]]
+name = "furrr"
+version = "0.4.0"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    { name = "future", requirement = "(>= 1.70.0)" },
+    { name = "globals", requirement = "(>= 0.19.1)" },
+    { name = "purrr", requirement = "(>= 1.2.1)" },
+    { name = "rlang", requirement = "(>= 1.1.7)" },
+    { name = "vctrs", requirement = "(>= 0.7.0)" },
+]
+
+[[packages]]
 name = "futile.logger"
 version = "1.4.9"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
@@ -1165,6 +1197,18 @@ version = "1.0.1"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
 force_source = false
 dependencies = []
+
+[[packages]]
+name = "future"
+version = "1.75.0"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    "digest",
+    { name = "globals", requirement = "(>= 0.18.0)" },
+    { name = "listenv", requirement = "(>= 0.8.0)" },
+    { name = "parallelly", requirement = "(>= 1.44.0)" },
+]
 
 [[packages]]
 name = "gargle"
@@ -1215,6 +1259,22 @@ dependencies = [
 ]
 
 [[packages]]
+name = "ggh4x"
+version = "0.3.1"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    { name = "ggplot2", requirement = "(>= 3.5.2)" },
+    "gtable",
+    "scales",
+    { name = "vctrs", requirement = "(>= 0.5.0)" },
+    { name = "rlang", requirement = "(>= 1.1.0)" },
+    "lifecycle",
+    "cli",
+    "S7",
+]
+
+[[packages]]
 name = "ggplot2"
 version = "4.0.3"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
@@ -1229,6 +1289,64 @@ dependencies = [
     { name = "scales", requirement = "(>= 1.4.0)" },
     { name = "vctrs", requirement = "(>= 0.6.0)" },
     { name = "withr", requirement = "(>= 2.5.0)" },
+]
+
+[[packages]]
+name = "ggpubr"
+version = "1.0.0"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    { name = "ggplot2", requirement = "(>= 3.5.2)" },
+    { name = "ggrepel", requirement = "(>= 0.9.2)" },
+    "ggsci",
+    { name = "tidyr", requirement = "(>= 1.3.2)" },
+    "purrr",
+    { name = "dplyr", requirement = "(>= 1.2.0)" },
+    { name = "cowplot", requirement = "(>= 1.2.0)" },
+    "ggsignif",
+    "scales",
+    "gridExtra",
+    "glue",
+    "polynom",
+    { name = "rlang", requirement = "(>= 1.1.7)" },
+    { name = "rstatix", requirement = "(>= 1.0.0)" },
+    "tibble",
+    "magrittr",
+]
+
+[[packages]]
+name = "ggrepel"
+version = "0.9.8"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    { name = "ggplot2", requirement = "(>= 3.5.2)" },
+    "Rcpp",
+    { name = "rlang", requirement = "(>= 1.1.6)" },
+    "S7",
+    { name = "scales", requirement = "(>= 1.4.0)" },
+    { name = "withr", requirement = "(>= 3.0.2)" },
+]
+
+[[packages]]
+name = "ggsci"
+version = "5.2.0"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    { name = "ggplot2", requirement = "(>= 2.0.0)" },
+    "rlang",
+    "scales",
+]
+
+[[packages]]
+name = "ggsignif"
+version = "0.6.4"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    { name = "ggplot2", requirement = "(>= 3.3.5)" },
 ]
 
 [[packages]]
@@ -1248,6 +1366,15 @@ dependencies = [
     "scales",
     "stringr",
     "tidyr",
+]
+
+[[packages]]
+name = "globals"
+version = "0.19.1"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    "codetools",
 ]
 
 [[packages]]
@@ -1518,6 +1645,16 @@ dependencies = [
 ]
 
 [[packages]]
+name = "later"
+version = "1.4.8"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    { name = "Rcpp", requirement = "(>= 1.0.10)" },
+    "rlang",
+]
+
+[[packages]]
 name = "lattice"
 version = "0.22-7"
 source = { builtin = true }
@@ -1542,6 +1679,13 @@ force_source = false
 dependencies = [
     "statmod",
 ]
+
+[[packages]]
+name = "listenv"
+version = "1.0.0"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = []
 
 [[packages]]
 name = "lme4"
@@ -1737,6 +1881,13 @@ force_source = false
 dependencies = []
 
 [[packages]]
+name = "parallelly"
+version = "1.48.0"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = []
+
+[[packages]]
 name = "patchwork"
 version = "1.3.2"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
@@ -1804,6 +1955,13 @@ dependencies = [
 [[packages]]
 name = "png"
 version = "0.1-9"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = []
+
+[[packages]]
+name = "polynom"
+version = "1.4-1"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
 force_source = false
 dependencies = []
@@ -1887,6 +2045,26 @@ dependencies = [
     "MatrixModels",
     "survival",
     "MASS",
+]
+
+[[packages]]
+name = "quarto"
+version = "1.5.1"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    "cli",
+    "fs",
+    "htmltools",
+    "jsonlite",
+    "later",
+    "lifecycle",
+    "processx",
+    "rlang",
+    "rmarkdown",
+    "rstudioapi",
+    "xfun",
+    { name = "yaml", requirement = "(>= 2.3.10)" },
 ]
 
 [[packages]]
@@ -2105,6 +2283,25 @@ version = "2.1.1"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
 force_source = false
 dependencies = []
+
+[[packages]]
+name = "rstatix"
+version = "1.1.0"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    { name = "tidyr", requirement = "(>= 1.0.0)" },
+    "purrr",
+    { name = "broom", requirement = "(>= 0.7.4)" },
+    { name = "rlang", requirement = "(>= 0.3.1)" },
+    { name = "tibble", requirement = "(>= 2.1.3)" },
+    { name = "dplyr", requirement = "(>= 0.7.1)" },
+    "magrittr",
+    "corrplot",
+    { name = "tidyselect", requirement = "(>= 1.2.0)" },
+    "car",
+    { name = "generics", requirement = "(>= 0.0.2)" },
+]
 
 [[packages]]
 name = "rstudioapi"

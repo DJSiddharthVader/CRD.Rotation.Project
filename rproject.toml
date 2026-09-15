@@ -38,4 +38,13 @@ dependencies = [
     "ggplot2",
     "dplyr",
     "edgeR",
+    "ggpubr",
+    "GGally",
+    "scales",
+    "ComplexUpset",
+    "furrr",
+    "ggh4x",
+    "rmarkdown",
+    "knitr",
+    "quarto",
 ]
