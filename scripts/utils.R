@@ -186,6 +186,24 @@ load_sample_metadata <- function(...){
                     Final.Dx
                 )
             }
+    ) %>% 
+    mutate(
+        age=as.integer(age),
+        CDR_3levels=
+            factor(
+                CDR_3levels,
+                levels=c('Healthy', 'MCI', 'Dementia')
+            ),
+        Braak_3levels=
+            factor(
+                Braak_3levels,
+                levels=c('Braak_Max2', 'Braak_3to4', 'Braak_5plus')
+            ),
+        AD_CERAD_withDLB=
+            factor(
+                AD_CERAD_withDLB,
+                levels=c('Control', 'AD', 'Other')
+            )
     )
 }
 
