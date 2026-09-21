@@ -5,6 +5,7 @@ suppressPackageStartupMessages({
     library(sva)
     library(GenomicRanges)
     library(decorate)
+    library(limma)
     library(variancePartition)
 })
 

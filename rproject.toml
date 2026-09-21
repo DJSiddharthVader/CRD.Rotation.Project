@@ -28,6 +28,7 @@ repositories = [
 dependencies = [
     "variancePartition",
     { name = "decorate", git = "https://github.com/GabrielHoffman/decorate.git", branch = "master" },
+    { name = 'peer', git='https://github.com/PMBio/peer.git', branch='master' },
     "tidyverse",
     "magrittr",
     "sva",
@@ -47,4 +48,7 @@ dependencies = [
     "rmarkdown",
     "knitr",
     "quarto",
+    "forcats",
+    "limma",
+    "bladderbatch",
 ]

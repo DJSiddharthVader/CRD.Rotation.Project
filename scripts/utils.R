@@ -6,6 +6,7 @@ suppressPackageStartupMessages({
     library(magrittr)
     library(tictoc)
     library(glue)
+    library(forcats)
     # library(optparse)
     # library(furrr)
     # library(plyranges)
