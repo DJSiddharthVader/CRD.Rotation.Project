@@ -277,3 +277,44 @@ generate_peak_cluster_with_decorate <- function(
 }
 
 run_decorate_pipeline <- function(
+############################################################
+# Misc posterity code
+############################################################
+sva_docs_example_correlations <- function() {
+    library(bladderbatch)
+    data(bladderdata)
+    pheno = pData(bladderEset)
+    edata = exprs(bladderEset)
+    mod = model.matrix(~as.factor(cancer), data=pheno)
+    mod0 = model.matrix(~1,data=pheno)
+    n.sv = num.sv(edata,mod,method="be"); n.sv
+    svobj = sva(edata,mod,mod0,n.sv=n.sv)
+    colnames(svobj$sv) <- paste0('SV', 1:n.sv)
+    canCorPairs(
+        paste(c('~ cancer', colnames(svobj$sv)), collapse='+'),
+        data=bind_cols(svobj$sv, pheno)
+    )
+    n.sv = num.sv(edata,mod,method="leek"); n.sv
+    svobj = sva(edata,mod,mod0,n.sv=n.sv)
+    colnames(svobj$sv) <- paste0('SV', 1:n.sv)
+    canCorPairs(
+        paste(c('~ cancer', colnames(svobj$sv)), collapse='+'),
+        data=bind_cols(svobj$sv, pheno)
+    )
+    # my function shich should be the same
+    run_sva(
+        sample.metadata=as_tibble(pheno ),
+        counts.matrix=edata,
+        full.model.vars=c('cancer'),
+        reduced.model.vars=NULL,
+    ) %>% 
+    as.data.frame() %>% 
+    column_to_rownames('SampleID') %>% 
+    {
+        canCorPairs(
+            paste(c('~ cancer', colnames(.)), collapse='+'),
+            data=bind_cols(., pheno)
+        )
+    }
+}
+
