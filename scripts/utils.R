@@ -243,3 +243,12 @@ list_all_ATAC_coordinates_sets <- function(){
     select(-c(dims))
 }
 
+list_all_ATAC_datasets <- function(){
+    # First list residual ATAC-seq count matrices that can be used to annotate CRDs
+    list_all_ATAC_residual_sets() %>% 
+    # get data specifying peak coordinates for each set of residuals
+    left_join(
+        list_all_ATAC_coordinates_sets(),
+        by=join_by(CPM.cutoff)
+    )
+}

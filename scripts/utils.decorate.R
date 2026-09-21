@@ -12,7 +12,7 @@ suppressPackageStartupMessages({
 ############################################################
 # Input PreProcessing
 ############################################################
-select_samples_to_include_for_decorate <- function(
+select_sample_subset <- function(
     sample.metadata,
     AD.definition.column,
     sample.strategy,
@@ -47,7 +47,7 @@ select_samples_to_include_for_decorate <- function(
     pull(SampleID)
 }
 
-pick_samples_to_use <- function(
+subset_peak_data <- function(
     residuals.filepath,
     coords.filepath,
     sample.metadata,
@@ -74,7 +74,7 @@ pick_samples_to_use <- function(
         )
     # select which samples to include when annotating CRDs 
     samples.to.keep <- 
-        select_samples_to_include_for_decorate(
+        select_sample_subset(
             sample.metadata=sample.metadata,
             AD.definition.column=AD.definition.column,
             sample.strategy=sample.strategy
@@ -85,7 +85,8 @@ pick_samples_to_use <- function(
     # peak.residuals.mx <- peak.residuals.mx[peaks.to.keep, samples.to.keep]
     list(
         residuals=peak.residuals.mx[peaks.to.keep, samples.to.keep],
-        locations=peak.locations.gr[peaks.to.keep, ]
+        locations=peak.locations.gr[peaks.to.keep, ],
+        sample.metadata=sample.metadata %>% filter(SampleID %in% samples.to.keep)
     )
 }
 

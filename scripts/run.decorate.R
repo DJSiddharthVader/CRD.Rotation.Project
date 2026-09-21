@@ -11,13 +11,7 @@ sample.metadata <- load_sample_metadata()
 # Generate all input dataset + hyper-param combinations to test
 ############################################################
 all.input.and.parameter.combinations.df <- 
-    # First list residual ATAC-seq count matrices that can be used to annotate CRDs
-    list_all_ATAC_residual_sets() %>% 
-    # get data specifying peak coordinates for each set of residuals
-    left_join(
-        list_all_ATAC_coordinates_sets(),
-        by=join_by(CPM.cutoff)
-    ) %>% 
+    list_all_ATAC_datasets() %>% 
     filter(CPM.cutoff == '3CPM') %>% 
     filter(residual.model == 'KeepDxAge') %>% 
     # which sets of samples to use to call CRDs
