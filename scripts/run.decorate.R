@@ -2,8 +2,7 @@
 # Dependencies
 ############################################################
 library(here)
-source(here('scripts', 'locations.R'))
-source(here('scripts', 'utils.R'))
+source(here('scripts', 'basic.imports.R'))
 source(here('scripts', 'utils.decorate.R'))
 # load patient metadata
 sample.metadata <- load_sample_metadata()
@@ -21,37 +20,20 @@ all.input.and.parameter.combinations.df <-
     ) %>% 
     filter(CPM.cutoff == '3CPM') %>% 
     filter(residual.model == 'KeepDxAge') %>% 
-    # decorate hyper-parameter values to test
-    cross_join(
-        tibble(
-            # Different inputs to generate CRD annotations from
-            sample.strategy=
-                c(
-                    'Control.Samples',   # only annotated CRDs using Control samples
-                    'AD.Samples',        # only annotate CRDs using AD samples
-                    'All.Samples'        # annotate CRDs using All samples
-                ),
-            # which metadata column we use to define sample conditions
-            AD.definition.column=
-                c(
-                    # 'Braak_3levels',   # Braak_5plus, Braak_3to4, Braak_Max2
-                    'AD_CERAD_withDLB' # AD, Control, Other
-                )
-        )
+    # which sets of samples to use to call CRDs
+    cross_join(RESIDUAL_MATRIX_SAMPLE_PARAMS_DF) %>% 
+    # map files with estimated SVs to the corresponding residual matrices
+    left_join(
+        list_all_SVs(),
+        by=join_by(CPM.cutoff, residual.model, AD.definition.column, sample.strategy)
     ) %>% 
-    cross_join(
-        tibble(
-            adjacentCount=c(500),
-            method.corr=c("spearman"),
-            clusterMethod=c("meanClusterSize"),
-            # meanClusterSize=list(list(20, 30, 40, 50)),
-            meanClusterSize=list(list(10, 25, 50, 80, 100)),
-            filterMetric=c("LEF"),
-            filterMetricCutoff=c(0.15),
-            jaccardCutoff=c(0.9)
-        )
-    )
-
+    # Define all relevant arguments/analysis decisions/parameters to decorate in the results filepath
+    # explicity, this also allows for easier parsing of the results, associating each results
+    # file with this metadata automatically in R
+    cross_join(DECORATE_HYPER_PARAMS_DF) %>%
+    # cross_join(tibble(SVs.included=c('All', 'None', 'uncorrelated')))
+    # cross_join(tibble(SVs.included=c('All', 'None', 'uncorrelated', 5)))
+    cross_join(tibble(SVs.included=c('All', 'None')))
 ############################################################
 # Compute Surrogate Variables (SVs) and produce corrected matrices
 ############################################################

@@ -16,29 +16,8 @@ format:
       light: flatly
       dark: darkly
 ---
+{{< include _imports.qmd >}}
 
-Set notebook options
-```{r knitr_options}
-library(knitr)
-knitr::opts_chunk$set(
-    results=FALSE,
-    message=FALSE,
-    warning=FALSE,
-    # dev=c('png', 'pdf', 'svg'),
-    dev=c('png'),
-    dpi=300
-)
-```
-Load dependencies
-```{r load_dependencies}
-library(here)
-source(here('scripts', 'locations.R'))
-source(here('scripts', 'utils.R'))
-source(here('scripts', 'utils.decorate.R'))
-source(here('scripts', 'utils.plot.R'))
-```
-
-# Load SVs
 
 ```{r load_data}
 # all.sample.metadata %>% count(AD_CERAD_withDLB)
