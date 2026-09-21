@@ -8,3 +8,5 @@ rv/
 # Quarto files
 *.html
 *_files
+/results/peak.SVs/CPM.cutoff_3CPM
+/scripts/roman.scripts
