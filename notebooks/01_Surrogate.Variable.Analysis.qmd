@@ -7,22 +7,20 @@ output:
     toc: true
     number_sections: true
 lightbox: true
-format: 
+format:
   html:
-    fig-width: 6
-    fig-height: 4
+    fig-width: 9
+    fig-height: 5
     code-fold: true
     theme:
-      light: flatly
-      dark: darkly
+        dark: darkly
+        light: flatly
 ---
 {{< include _imports.qmd >}}
 
-
+Load SVs and sample data
 ```{r load_data}
-# all.sample.metadata %>% count(AD_CERAD_withDLB)
-# all.sample.metadata %>% count(Braak_3levels)
-# all.sample.metadata %>% count(CDR_3levels)
+source(here('scripts', 'utils.decorate.R'))
 all.sample.metadata <- 
     load_sample_metadata()
 all.SVs.df <- 
@@ -42,14 +40,19 @@ all.SVs.df <-
                     },
                 sample.metadata=all.sample.metadata
             )
-    )
+    ) %>% 
+    select(-c(SVs.filepath))
 ```
-
-# Correlation of SVs and Sample Metadata
-
-```{r plotSV_metadata_correlation}
-
-make_heatmap <- function(SVs.df, model.vars, ...) {
+Functions 
+```{r plot_functions}
+make_correlation_data <- function(SVs.df, model.vars, ...) {
+    # SVs.df=all.SVs.df$SVs.df[[1]]; model.vars=c('sex', 'RACE', 'Biobank', ALL_PHENOTYPE_COLUMNS)
+    for (variable in model.vars) {
+        is.constant <- SVs.df %>% pull(variable) %>% {all(duplicated(.)[-1L])}
+        if (is.constant) {
+            model.vars <- model.vars[model.vars != variable]
+        }
+    }
     all.vars <- 
         c(
             model.vars,
@@ -67,55 +70,184 @@ make_heatmap <- function(SVs.df, model.vars, ...) {
         names_to='Var2',
         values_to='corr'
     ) %>% 
-    mutate(across(c(Var1, Var2), ~ factor(.x, levels=all.vars))) %>% 
-    mutate(corr.label=round(corr, 2)) %>% 
-    ggplot(aes(x=Var1, y=Var2, fill=corr)) +
-    geom_tile() +
-    geom_text(
-        aes(label=corr.label), 
-        color='white',
-        size=2
-    ) + 
-    make_ggtheme() +
-    theme(
+    mutate(across(c(Var1, Var2), ~ factor(.x, levels=all.vars)))
+}
+```
+
+# Correlation of SVs between sample sets
+
+Here we plot the correlation of SVs estimated on different set of samples, specifically we compare SVs estimated from AD samples only or Controls only to All samples.
+We only compare the SV correlations between common samples for each pair of different SV sets.
+```{r plot_SV_SV_correlation}
+#| output: asis 
+#| echo: false
+# #| fig-width: 11
+# #| fig-height: 6
+SV.correlations.df <- 
+    tribble(
+        ~sample.set.1, ~sample.set.2, 
+        'All.Samples', 'AD.Samples',
+        'All.Samples', 'Control.Samples',
+        'No.Others',   'AD.Samples',
+        'No.Others',   'Control.Samples',
+    ) %>%
+    left_join(
+        all.SVs.df,
+        by=join_by(sample.set.1 == sample.strategy)
+
+    ) %>% 
+    left_join(
+        all.SVs.df,
+        suffix=c('.1', '.2'),
+        by=
+            join_by(
+                CPM.cutoff, residual.model, AD.definition.column,
+                sample.set.2 == sample.strategy
+            )
+    ) %>% 
+    mutate(
+        SV.corr=
+            pmap(
+                .l=.,
+                .f=
+                    function(SVs.df.1, SVs.df.2, ...) {
+                        SVs.df.1 <- 
+                            SVs.df.1 %>% 
+                            as.data.frame() %>%
+                            column_to_rownames('SampleID') %>% 
+                            select(starts_with('SV'))
+                        SVs.df.2 <- 
+                            SVs.df.2 %>%
+                            as.data.frame() %>%
+                            column_to_rownames('SampleID') %>% 
+                            select(starts_with('SV'))
+                        common.samples <- 
+                            intersect(rownames(SVs.df.1), rownames(SVs.df.2))
+                        cor.mat <- 
+                            cor(
+                                SVs.df.1[common.samples, ],
+                                SVs.df.2[common.samples, ]
+                            ) %>%
+                            as.data.frame()
+                        rownames(cor.mat) <- colnames(SVs.df.1)
+                        colnames(cor.mat) <- colnames(SVs.df.2)
+                        cor.mat %>% 
+                        rownames_to_column('SVs.1') %>%
+                        as_tibble() %>%
+                        pivot_longer(
+                            -c(SVs.1),
+                            names_to='SVs.2',
+                            values_to='cor'
+                        )
+                    }
+            )
+    ) %>% 
+    select(-c(SVs.df.1, SVs.df.2)) %>%
+    unnest(SV.corr) %>% 
+    mutate(
+        comparison=glue('{sample.set.1} vs {sample.set.2}'),
+        cor.label=round(cor, 2),
+        sv.int.1=SVs.1 %>% str_remove('^SV') %>% as.integer(),
+        SVs.1=fct_reorder(SVs.1, sv.int.1),
+        sv.int.2=SVs.2 %>% str_remove('^SV') %>% as.integer(),
+        SVs.2=fct_reorder(SVs.2, sv.int.2)
+    )
+# Now plot correlation of SVs across datasets
+SV.correlations.df %>% 
+    make_nested_plot_tabs(
+        max.header.lvl=2,
+        # group.cols=c('CPM.cutoff', 'residual.model', 'comparison'),
+        # group.cols=c('CPM.cutoff', 'residual.model'), facet.row='sample.set.2', facet.col='sample.set.1',
+        # group.cols=c('CPM.cutoff', 'sample.set.1', 'residual.model'), facet.col='sample.set.2',
+        group.cols=c('CPM.cutoff', 'sample.set.1'), facet.col='residual.model', facet.row='sample.set.2',
+        plot.fnc=plot_heatmap,
+        x.var='SVs.1',
+        y.var='SVs.2',
+        fill.var='cor', 
+        label.var='cor.label',
+        label.size=2,
+        label.color='black',
+        scales='free',
+        space='free',
+        independent=TRUE,
+        fill.axis.label.accuracy=0.01,
+        plot.elements=list(scale_fill_gradient2(low = "red", mid = "white", high = "blue", midpoint = 0)),
         axis.text.x=element_text(angle=45, vjust=1, hjust=1),
         axis.line=element_blank(),
-        axis.title=element_blank(),
+        axis.title=element_blank()
     )
-}
+```
+
+# Correlation of SVs and Sample Metadata
+
+Here we plot the correlation of estimated SVs with various sample characteristics e.g. AD phenotypes, Age and model co-variates.
+```{r plotSV_metadata_correlation}
+#| output: asis 
+#| echo: false
 all.SVs.df %>% 
-mutate(
-    figures=
-        pmap(
-            .l=.,
-            .f=make_heatmap,
-            model.vars=c('Braak_3levels', 'CDR_3levels', 'age')
-        )
-) %>%
-pull(figures)
-# compartments.df %>% 
-    # group_by() %>% 
-    # summarize() %>%  # Gb scale
-    # ungroup() %>% 
-    # calc_pct(col_pct='compartment') %>% 
-    # make_nested_plot_tabs(
-    #     max.header.lvl=3,
-    #     group.cols=c('resolution', 'compartment.params'),
-    #     plot.fnc=plot_barplot,
-    #     # plot.fnc=plot_violin,
-    #     x.var='Edit',
-    #     y.var='pct',
-    #     y.scale.mode='pct',
-    #     fill.var='compartment', 
-    #     facet.col='Genotype',
-    #     position='stack',
-    #     label.var='n.and.pct.label',
-    #     scales='free_x',
-    #     space='free_x',
-    #     # legend.text=element_text(angle=35, hjust=1),
-    #     # axis.text.x=element_text(angle=45, hjust=1),
-    #     axis.title.x=element_blank(),
-    #     axis.title.y=element_blank()
-    # )
+    mutate(
+        corr.df=
+            pmap(
+                .l=.,
+                .f=make_correlation_data,
+                model.vars=
+                    c(
+                        'RACE',
+                        'sex',
+                        'Biobank',
+                        ALL_PHENOTYPE_COLUMNS
+                    )
+            )
+    ) %>% 
+    select(-SVs.df) %>% 
+        # {.} -> tmp; tmp; tmp$corr.df[[1]]
+    unnest(corr.df) %>% 
+    mutate(corr.label=round(corr, 2)) %>% 
+    make_nested_plot_tabs(
+        max.header.lvl=2,
+        # group.cols=c('CPM.cutoff', 'residual.model'), facet.col='sample.strategy',
+        # group.cols=c('residual.model', 'sample.strategy'),
+        group.cols=c('CPM.cutoff', 'sample.strategy'), facet.col='residual.model',
+        plot.fnc=plot_heatmap,
+        y.var='Var1',
+        x.var='Var2',
+        fill.var='corr', 
+        label.var='corr.label',
+        label.size=2,
+        label.color='white',
+        # scales='free',
+        # space='free',
+        # independent=TRUE,
+        # scales='free',
+        axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+        axis.line=element_blank(),
+        axis.title=element_blank()
+    )
+```
+
+# variancePartition Analysis
+
+What is the variance explained by the model variables pre-post residualizing out SVs?
+How much varaince to the SVs account for in terms of chromatin accessability?
+
+# CRD Elbow Plot of LEFs vs SVs
+
+First load all the data where we calcualted all decorate CRD LEFs from separate matrices with different sets of SVs regressed out i.e. {1}, {1,2}, {1,2,3,...N} etc. 
+Most matrices only had 1-4 SVs estimated.
+```{r load_elbow_data}
+
+    SVA_RESULTS_DIR %>% 
+    parse_results_filelist(
+        suffix='elbow.plot.data.tsv',
+        filename.column.name='filename'
+    ) %>%
+    dplyr::rename('elbow.filepath'=filepath) %>% 
+    select(-c(filename)) %>%
+    {read_tsv(.$elbow.filepath)} %>% count(SVs.included, meanClusterSize)
+```
+Here we build and elbow plot with showing the LEF distribution across peaks for each residual matrix with the specified SVs regressed out. This shows us 
+```{r plot_LEF_elbow}
+#| output: asis
+
 ```
 
