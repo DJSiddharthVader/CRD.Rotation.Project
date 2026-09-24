@@ -125,4 +125,42 @@ peak.and.SV.combos.df %>%
     )
 
 ############################################################
+# variancePartition analysis showing how much variance contributions from metadata change pre/post
+# SV residualizing and what the SV contributions are
+# Should repeat across SV titrations (i.e. increasing number of included SVs separately)
+############################################################
+plan(multisession, workers=TOTAL_CORES)
+peak.matrices.df %>% 
+    # define output filepath for R blob with decorate results
+    mutate(
+        results_dir=
+            file.path(
+                ELBOW_RESULTS_DIR,
+                glue('CPM.cutoff_{CPM.cutoff}'),
+                glue('residual.model_{residual.model}'),
+                glue('AD.definition.column_{AD.definition.column}'),
+                glue('sample.strategy_{sample.strategy}'),
+                glue('n.SVs_{n.SVs}'),
+                glue('z.score.counts_{z.score.counts}'),
+                glue('adjacentCount_{adjacentCount}'),
+                glue('method.corr_{method.corr}'),
+                glue('clusterMethod_{clusterMethod}'),
+                glue('filterMetric_{filterMetric}'),
+                glue('filterMetricCutoff_{filterMetricCutoff}'),
+                glue('jaccardCutoff_{jaccardCutoff}')
+            ),
+        # results_file=file.path(results_dir, 'elbow.cluster.data.tsv')
+        results_file=file.path(results_dir, 'SV.variance.partition.results.tsv')
+    ) %>% 
+    # for each SV i, include up to SVs 0:i and regress out -> varPar on SV-regressed out matrix
+    future_pmap(
+        .l=.,
+        .f=check_cached_results,
+        return_data=FALSE,
+        # force_redo=TRUE,
+        silence=TRUE,
+        results_fnc=generate_SV_varpar_results,
+        all.sample.metadata=all.sample.metadata,
+        .progress=TRUE
+
     )

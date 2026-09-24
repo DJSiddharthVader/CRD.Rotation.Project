@@ -273,6 +273,70 @@ generate_elbow_data <- function(
     unnest(LEFs)
 }
 
+run_varaincePartition <- function(
+    peak.residuals.mx,
+    sample.metadata,
+    model.formula,
+    ...){
+    fitExtractVarPartModel(
+        exprObj=peak.residuals.mx,
+        form=model.formula,
+        data=sample.metadata,
+        ...
+        # showWarnings=FALSE,
+        # hideErrorsInBackend=TRUE,
+    ) %>%
+    as.data.frame() %>%
+    rownames_to_column('PeakID') %>%
+    as_tibble()
+}
+
+generate_SV_varpar_results <- function(
+    all.sample.metadata,
+    residuals.filepath,
+    coords.filepath,
+    AD.definition.column,
+    sample.strategy,
+    SVs.filepath,
+    model.variables,
+    ...){
+    peak.data <- 
+        subset_peak_data(
+            residuals.filepath=residuals.filepath,
+            coords.filepath=coords.filepath,
+            sample.metadata=sample.metadata,
+            AD.definition.column=AD.definition.column,
+            sample.strategy=sample.strategy
+        )
+    # estimate SVs from peak residuals 
+    SVs.df <- 
+        SVs.filepath %>% 
+        read_tsv(show_col_types=FALSE) %>%
+        left_join(all.sample.metadata, by='SampleID') %>% 
+        as.data.frame() %>%
+        column_to_rownames('SampleID')
+
+    all.SVs <- SVs.df %>% colnames() %>% grep('^SV', ., value=TRUE)
+    tibble(SVs.included=0:length(all.SVs)) %>%
+    mutate(
+        model.formula=
+            paste0(c(model.variables, all.SVs[0:SVs.included], collapse='+')) %>% 
+            sprintf('~ %s', .) %>%
+            formula(),
+        variancePartitionResults=
+            future_pmap(
+            # pmap(
+                .l=.,
+                .f=run_varaincePartition,
+                ...,
+                peak.residuals.mx=peak.data$residuals,
+                sample.metadata=SVs.df
+                .progress=TRUE
+            )
+    ) %>%
+    unnest(variancePartitionResults)
+}
+
 ############################################################
 # Generate decorate clusters
 ############################################################
