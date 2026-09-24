@@ -4,6 +4,7 @@
 library(here)
 source(here('scripts', 'basic.imports.R'))
 source(here('scripts', 'utils.decorate.R'))
+# handlers(global=TRUE) # for progress bars
 # load patient metadata
 all.sample.metadata <- 
     load_sample_metadata()
@@ -25,6 +26,7 @@ peak.matrices.df <-
 # Compute Surrogate Variables (SVs) and produce corrected matrices
 # generate with different numbers?
 ############################################################
+plan(multisession, workers=TOTAL_CORES)
 peak.matrices.df %>% 
     mutate(
         results_dir=

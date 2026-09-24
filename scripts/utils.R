@@ -19,15 +19,19 @@ check_cached_results <- function(
     results_file,
     force_redo=FALSE,
     return_data=TRUE,
-    show_col_types=FALSE,
     silence=FALSE,
+    p=NULL,
     results_fnc,
     ...){
     # Now check if the results file exists and load it
     tic()
     if (is.null(results_file)) {
-        if (!silence) { message("No results file, will just return data") }
-        results <- results_fnc(...)
+        if (silence) { 
+            results <- invisible(results_fnc(...))
+        } else {
+            message("No results file, will just return data") 
+            results <- results_fnc(...)
+        }
         return_data <- TRUE
     } else {
         output.filetype <- results_file %>% str_extract('\\.[^\\.]*$') 
@@ -36,10 +40,15 @@ check_cached_results <- function(
             load_fnc <- readRDS
             save_fnc <- saveRDS
         } else if (output.filetype %in% c('.txt', '.tsv')) {
-            load_fnc <- partial(read_tsv, show_col_types=show_col_types)
+            load_fnc <- read_tsv
             save_fnc <- write_tsv
         } else {
             stop(glue('Invalid file extesion: {output.filetype}'))
+        }
+        # silence functions is specified
+        if (silence) {
+            load_fnc <- quietly(load_fnc)
+            save_fnc <- quietly(save_fnc)
         }
         if (file.exists(results_file) & !force_redo) {
             if (!silence) { message(glue('{results_file} exists, not recomputing results')) }
@@ -55,11 +64,17 @@ check_cached_results <- function(
                 if (!silence) { message(glue('No cached results, generating: {results_file}')) }
             }
             dir.create(dirname(results_file), recursive=TRUE, showWarnings=FALSE)
-            results <- results_fnc(...) %T>% save_fnc(results_file)
+            if (silence) { 
+                # results <- invisible(results_fnc(...))
+                results <- invisible(results_fnc(...)) %T>% save_fnc(results_file)
+            } else {
+                results <- results_fnc(...) %T>% save_fnc(results_file)
+            }
             # If results dont exist or force_redo is TRUE compute + cache results
             # Assumes save_fnc is of fomr save_fnc(result_object, filename)
         }
     }
+    if (!is.null(p)) { p() } # update progress bar if specified
     # Or dont save the results, just return the results
     if (!silence) { toc() }
     if (return_data) {
@@ -148,6 +163,7 @@ parse_results_filelist <- function(
 load_sample_metadata <- function(...){
     check_cached_results(
         ...,
+        # silence=TRUE,
         results_file=SAMPLE_METADATA_TSV_FILEPATH,
         results_fnc=
             function(){
