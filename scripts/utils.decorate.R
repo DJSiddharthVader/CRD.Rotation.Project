@@ -343,7 +343,6 @@ generate_peak_cluster_with_decorate <- function(
             adjacentCount=adjacentCount,
             method.corr=method.corr
         )
-    # tree.list %>% save_correlation_matrices(results_dir=results_dir)
     # Choose cutoffs and return clusters using multiple values for meanClusterSize 
     # Clusters corresponding to each parameter value are returned and then processed downstream
     # By using multiple parameter values, epigenetic features are included in clusters 
@@ -356,20 +355,7 @@ generate_peak_cluster_with_decorate <- function(
         )
     tree.scores <- 
         tree.list %>% 
-        # scoreClusters(all.tree.list.clusters, BPPARAM=SnowParam(cores))
-        scoreClusters(all.tree.list.clusters)
-    # tree.list
-    # all.tree.list.clusters
-    scores.df <- 
-        tree.scores %>%
-        sapply(
-            FUN=as_tibble,
-            simplify=FALSE,
-            USE.NAMES=TRUE
-        ) %>% 
-        bind_rows(.id='meanClusterSize')
-
-    tree.scores$`10` %>% as_tibble()
+        scoreClusters(all.tree.list.clusters, BPPARAM=SnowParam(cores))
     filtered.tree.list.clusters <- 
         tree.scores %>% 
         retainClusters( 
@@ -385,14 +371,102 @@ generate_peak_cluster_with_decorate <- function(
         )
     # return all data
     list(
+        cluster.LEFs=
+            tree.scores %>%
+            sapply(
+                FUN=as_tibble,
+                simplify=FALSE,
+                USE.NAMES=TRUE
+            ) %>% 
+            bind_rows(.id='meanClusterSize'),
         tree.list=tree.list,
-        cluster.LEFs=,
         all.clusters=all.tree.list.clusters,
-        filtered.clusters=
+        filtered.clusters=filtered.tree.list.clusters
     )
 }
 
 run_decorate_pipeline <- function(
+    residuals.filepath,
+    coords.filepath,
+    SVs.filepath,
+    sample.metadata,
+    AD.definition.column='AD_CERAD_withDLB',
+    sample.strategy='All',
+    SVs.included='All',
+    SV.cor.thresh=0.3,
+    LEFs.only=FALSE,
+    ...) {
+    # subset + order data as defined
+    peak.data <- 
+        subset_peak_data(
+            residuals.filepath=residuals.filepath,
+            coords.filepath=coords.filepath,
+            sample.metadata=sample.metadata,
+            AD.definition.column=AD.definition.column,
+            sample.strategy=sample.strategy
+        )
+    # estimate SVs from peak residuals 
+    SVs.df <- 
+        SVs.filepath %>%
+        read_tsv(show_col_types=FALSE) %>%
+        as.data.frame() %>%
+        column_to_rownames('SampleID')
+    # regress out SVs from residuals
+    total.SVs <- ncol(SVs.df)
+    if (SVs.included == 'All' | SVs.included > total.SVs) { 
+        message('Regressing out all SVs before running decorate')
+        SV.adjusted.peak.residuals.mx <- 
+            adjust_residuals_with_svs(
+                peak.residuals.mx=peak.data$residuals,
+                SVs.df=SVs.df,
+                SVs.included=colnames(SVs.df)
+            )
+    } else if (SVs.included <= total.SVs & SVs.included > 0) { 
+        message(glue('Regressing out {SVs.included} SVs before running decorate'))
+        SV.adjusted.peak.residuals.mx <- 
+            adjust_residuals_with_svs(
+                peak.residuals.mx=peak.data$residuals,
+                SVs.df=SVs.df,
+                SVs.included=colnames(SVs.df)[1:SVs.included]
+            )
+    # } else if (SVs.included == 'uncorrelated') { 
+    #     message(glue('Regressing out SVs with < {SV.cor.thresh} correlation with any variables'))
+    #     SV.formula.correlations <-
+    #         sample.metadata %>%
+    #         select(c('SampleID', SV.cor.filter.variables)) %>% 
+    #         left_join(SVs.df %>% rownames_to_column('SampleID') %>% as_tibble(), by='SampleID') %>% 
+    #         canCorPairs(
+    #             # formula=sprintf('~%s', paste(SV.cor.filter.variables, colnames(SVs.df), collapse='+')),
+    #             formula=
+    #                 paste(
+    #                     paste(SV.cor.filter.variables, collapse='+'),
+    #                     '~',
+    #                     paste(colnames(SVs.df), collapse='+')
+    #                 ) %>%
+    #                 formula(),
+    #             data=.
+    #         ) %>%
+    #         rownames_to_column('SVs') %>% 
+    #         pivot_longer(-c(SVs), names_to='model.vars', value_to='corr')
+    #     SVs.included <-
+    #         SV.formula.correlations %>% 
+    #         filter(corr < SV.cor.thresh) %>%
+    #         pull(SVs)
+    #     message(glue('Using the following uncorrelated SVs: {paste(SVs.included, collapse=", ")}'))
+    #     SV.adjusted.peak.residuals.mx <- 
+    #         adjust_residuals_with_svs(
+    #             peak.residuals.mx=peak.data$residuals,
+    #             SVs.df=SVs.df,
+    #             SVs.included=SVs.included
+    #         )
+    } else if (SVs.included == 'None' | SVs.included == 0) {
+        message('Not regressing out any SVs before running decorate')
+        SV.adjusted.peak.residuals.mx <- peak.data$residuals
+    } else {
+        stop(glue('Invalid arg to SVs.included: {SVs.included}'))
+    }
+    # generate peak clusters
+    # SV.adjusted.peak.residuals.mx %>% as.data.frame() %>% rownames_to_column('PeakID')
     if (LEFs.only) {
         generate_LEFs_only_with_decorate(
             peak.residuals.mx=SV.adjusted.peak.residuals.mx,
@@ -406,6 +480,16 @@ run_decorate_pipeline <- function(
             ...
         )
     }
+}
+
+list_all_decorate_peak_clusters <- function(){
+    CRD_RESULTS_DIR %>%
+    parse_results_filelist(
+        suffix='-decorate.Peak.Clusters.tsv',
+        filename.column.name='cluster.scope'
+    )
+}
+
 ############################################################
 # Misc posterity code
 ############################################################
