@@ -1,12 +1,12 @@
-.Rprofile
 rv/
+.Rprofile
 /.here
-/all.sample.metadata.tsv
-/results/peak.SVs/CPM.cutoff_3CPM/residual.model_KeepDxAge
-/scripts/Rscripts_Processing_ATACseq_RK_6_12_26.R
 /scripts/scratch.R
+/scripts/roman.scripts
+/all.sample.metadata.tsv
+/results/
 # Quarto files
 *.html
-*_files
-/results/peak.SVs/CPM.cutoff_3CPM
-/scripts/roman.scripts
+/notebooks/*_files/
+/notebooks/*_cache/
+/scripts/.RData

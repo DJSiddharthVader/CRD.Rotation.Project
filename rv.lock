@@ -1220,6 +1220,15 @@ dependencies = [
 ]
 
 [[packages]]
+name = "futurize"
+version = "1.0.0"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    { name = "future", requirement = "(>= 1.69.0)" },
+]
+
+[[packages]]
 name = "gargle"
 version = "1.6.1"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
@@ -2005,6 +2014,24 @@ dependencies = [
 ]
 
 [[packages]]
+name = "progressify"
+version = "0.2.0"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    "progressr",
+]
+
+[[packages]]
+name = "progressr"
+version = "1.0.0"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    "digest",
+]
+
+[[packages]]
 name = "proxy"
 version = "0.4-29"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
@@ -2055,6 +2082,13 @@ dependencies = [
     "survival",
     "MASS",
 ]
+
+[[packages]]
+name = "quartabs"
+version = "0.1.1"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = []
 
 [[packages]]
 name = "quarto"

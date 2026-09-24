@@ -2,15 +2,14 @@
 title: Surrogate Variable Analysis
 author: "Siddharth Reed"
 date: "`r Sys.Date()`"
-output:
-  html_document:
-    toc: true
-    number_sections: true
 lightbox: true
 format:
   html:
     fig-width: 9
     fig-height: 5
+    smooth-scroll: true
+    toc: true
+    number_sections: true
     code-fold: true
     theme:
         dark: darkly
@@ -45,6 +44,47 @@ all.SVs.df <-
 ```
 Functions 
 ```{r plot_functions}
+```{r plot_SV_SV_correlation_qartabs}
+#| echo: false
+#| results: asis
+#| output: asis 
+#| fig-width: 15
+#| fig-height: 15
+# Now plot correlation of SVs across datasets
+nesting.vars <- c('CPM.cutoff', 'residual.model', 'comparison', 'z.score.counts')
+SV.correlations.df %>% 
+# # only compare SVs esstimated on the same sample sets
+# filter(comparison == sample.strategy.1) %>% 
+nest(plot.df=-all_of(nesting.vars)) %>% 
+mutate(
+    figures=
+        pmap(
+            .l=.,
+            .f=plot_heatmap,
+            facet.col='SVs.estimated.1',
+            facet.row='SVs.estimated.2',
+            x.var='SVs.1',
+            y.var='SVs.2',
+            fill.var='cor', 
+            # label.var='cor.label',
+            # label.size=2,
+            # label.color='black',
+            scales='free',
+            space='free',
+            # independent='all',
+            fill.axis.label.accuracy=0.01,
+            plot.elements=list(scale_fill_gradient2(low="red", mid="lightgrey", high="blue", midpoint=0)),
+            axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+            axis.line=element_blank(),
+            axis.title=element_blank(),
+            .progress=TRUE
+        )
+) %>% 
+render_tabset(
+    tabset_vars=nesting.vars,
+    output_vars=figures
+)
+cat(':::')
 make_correlation_data <- function(SVs.df, model.vars, ...) {
     # SVs.df=all.SVs.df$SVs.df[[1]]; model.vars=c('sex', 'RACE', 'Biobank', ALL_PHENOTYPE_COLUMNS)
     for (variable in model.vars) {
@@ -152,30 +192,6 @@ SV.correlations.df <-
         sv.int.2=SVs.2 %>% str_remove('^SV') %>% as.integer(),
         SVs.2=fct_reorder(SVs.2, sv.int.2)
     )
-# Now plot correlation of SVs across datasets
-SV.correlations.df %>% 
-    make_nested_plot_tabs(
-        max.header.lvl=2,
-        # group.cols=c('CPM.cutoff', 'residual.model', 'comparison'),
-        # group.cols=c('CPM.cutoff', 'residual.model'), facet.row='sample.set.2', facet.col='sample.set.1',
-        # group.cols=c('CPM.cutoff', 'sample.set.1', 'residual.model'), facet.col='sample.set.2',
-        group.cols=c('CPM.cutoff', 'sample.set.1'), facet.col='residual.model', facet.row='sample.set.2',
-        plot.fnc=plot_heatmap,
-        x.var='SVs.1',
-        y.var='SVs.2',
-        fill.var='cor', 
-        label.var='cor.label',
-        label.size=2,
-        label.color='black',
-        scales='free',
-        space='free',
-        independent=TRUE,
-        fill.axis.label.accuracy=0.01,
-        plot.elements=list(scale_fill_gradient2(low = "red", mid = "white", high = "blue", midpoint = 0)),
-        axis.text.x=element_text(angle=45, vjust=1, hjust=1),
-        axis.line=element_blank(),
-        axis.title=element_blank()
-    )
 ```
 
 # Correlation of SVs and Sample Metadata
@@ -183,46 +199,41 @@ SV.correlations.df %>%
 Here we plot the correlation of estimated SVs with various sample characteristics e.g. AD phenotypes, Age and model co-variates.
 ```{r plotSV_metadata_correlation}
 #| output: asis 
+```{r plot_SV_metadata_correlation}
+# #| eval: false
 #| echo: false
-all.SVs.df %>% 
-    mutate(
-        corr.df=
-            pmap(
-                .l=.,
-                .f=make_correlation_data,
-                model.vars=
-                    c(
-                        'RACE',
-                        'sex',
-                        'Biobank',
-                        ALL_PHENOTYPE_COLUMNS
-                    )
-            )
-    ) %>% 
-    select(-SVs.df) %>% 
-        # {.} -> tmp; tmp; tmp$corr.df[[1]]
-    unnest(corr.df) %>% 
-    mutate(corr.label=round(corr, 2)) %>% 
-    make_nested_plot_tabs(
-        max.header.lvl=2,
-        # group.cols=c('CPM.cutoff', 'residual.model'), facet.col='sample.strategy',
-        # group.cols=c('residual.model', 'sample.strategy'),
-        group.cols=c('CPM.cutoff', 'sample.strategy'), facet.col='residual.model',
-        plot.fnc=plot_heatmap,
-        y.var='Var1',
-        x.var='Var2',
-        fill.var='corr', 
-        label.var='corr.label',
-        label.size=2,
-        label.color='white',
-        # scales='free',
-        # space='free',
-        # independent=TRUE,
-        # scales='free',
-        axis.text.x=element_text(angle=45, vjust=1, hjust=1),
-        axis.line=element_blank(),
-        axis.title=element_blank()
-    )
+#| results: asis
+#| output: asis 
+#| fig-width: 15
+#| fig-height: 15
+nesting.vars <- c('CPM.cutoff', 'residual.model', 'z.score.counts', 'sample.strategy')
+SV.metadata.correlations.df %>% 
+nest(plot.df=-all_of(nesting.vars)) %>% 
+mutate(
+    figures=
+        pmap(
+            .l=.,
+            .f=plot_heatmap,
+            facet.group='SVs.estimated', facet.ncol=7,
+            y.var='SVs',
+            x.var='phenotypes',
+            fill.var='corr', 
+            label.var='corr.label',
+            label.size=2,
+            label.color='white',
+            scales='free',
+            space='free',
+            # independent=TRUE,
+            axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+            axis.line=element_blank(),
+            axis.title=element_blank(),
+            .progress=TRUE
+        )
+) %>% 
+render_tabset(
+    tabset_vars=nesting.vars,
+    output_vars=figures
+)
 ```
 
 # variancePartition Analysis

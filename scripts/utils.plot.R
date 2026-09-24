@@ -1,17 +1,19 @@
 ###################################################
 # Dependencies
 ###################################################
-library(ggplot2)
-library(ggpubr)
-library(ggh4x)
-library(ggridges)
-library(GGally)
-library(scales)
-library(ggpointdensity)
-library(viridis)
-library(ComplexUpset)
-library(quarto)
-library(furrr)
+suppressPackageStartupMessages({
+    library(ggplot2)
+    library(ggpubr)
+    library(ggh4x)
+    # library(ggridges)
+    library(GGally)
+    library(scales)
+    # library(ggpointdensity)
+    # library(viridis)
+    library(ComplexUpset)
+    library(quarto)
+    library(quartabs)
+})
 
 ###################################################
 # Transform data for plotting
@@ -212,6 +214,7 @@ scale_axis <- function(
 
 add_faceting <- function(
     figure,
+    scales='fixed',
     space='fixed',
     independent=FALSE,
     # solo_line=TRUE,
@@ -234,6 +237,7 @@ add_faceting <- function(
                     sep=' ~ '
                 ) %>%
                 formula(),
+                scales=scales, 
                 space=space,
                 independent=independent,
                 # solo_line=solo_line,
@@ -246,6 +250,7 @@ add_faceting <- function(
             figure +
             facet_nested(
                 formula(glue('{paste(facet.row, collapse=" + ")} ~ .')),
+                scales=scales, 
                 space=space,
                 independent=independent,
                 # solo_line=solo_line,
@@ -258,6 +263,7 @@ add_faceting <- function(
             figure +
             facet_nested(
                 formula(glue('~ {paste(facet.col, collapse=" + ")}')),
+                scales=scales, 
                 space=space,
                 independent=independent,
                 # solo_line=solo_line,
@@ -429,197 +435,6 @@ post_process_plot <- function(
             .
         }
     }
-}
-
-###################################################
-# Make tabs per plot in Rmd
-###################################################
-plot_figure_tabs <- function(
-    plot.df,
-    group.col,
-    plot.fnc,
-    header.lvl,
-    nl.delim,
-    figure.output.mode='rmd',
-    grob.nrow=1,
-    grob.ncol=NULL,
-    ...){
-    # List all the individual groups, generate 1 plot per group
-    group.values <- 
-        plot.df[[group.col]] %>% 
-        as.factor() %>% 
-        droplevels() %>% 
-        levels()
-    # Generate figures on mutually exclusive subsets of the data
-    figures <- 
-        # make plot with options for each group of the data
-        future_pmap(
-            .l=list(group.value=group.values),
-            .f=
-                function(group.value, group.col, plot.df, plot.fnc){
-                    plot.df %>%
-                    filter(!!sym(group.col) == group.value) %>%
-                    plot.fnc(...)
-                },
-            group.col=group.col,
-            plot.df=plot.df,
-            plot.fnc=plot.fnc,
-            .progress=FALSE
-        )
-    # print(group.values)
-    # print(length(figures))
-    # make a named list of figures
-    names(figures) <- group.values
-    # Print/combine/return plots as specified
-    {
-        # Print each figure under a md heading for Rmd notebooks
-        if (figure.output.mode == 'rmd') {
-            figures %>%
-            names() %>% 
-            sapply(
-                FUN=
-                    function(group.value, figures, header.lvl, nl.delim){
-                        cat(
-                            strrep('#', header.lvl), 
-                            group.value,
-                            nl.delim
-                        )
-                        print(figures[[group.value]])
-                        cat(nl.delim)
-                    },
-                figures=figures,
-                header.lvl=header.lvl,
-                nl.delim=nl.delim
-            )
-        # merge all the plots into a single figure with labeled panels
-        } else if (figure.output.mode == 'merged') {
-            cat(
-                strrep('#', header.lvl),
-                nl.delim
-            )
-            cowplot::plot.grid(
-                plotlist=figures,
-                nrow=grob.nrow,
-                ncol=grob.ncol,
-                labels=group.values,
-                axis='tb',
-                align='hv'
-            ) %>%
-            print()
-            cat(nl.delim)
-        # just return all the figures
-        } else if (figure.output.mode == 'return') {
-            return(figures)
-        } else {
-            stop(glue('Invalid arg for figure.output.mode: {figure.output.mode}'))
-        }
-    }
-}
-
-make_tabs_recursive <- function(
-    plot.df, 
-    group.cols,
-    current.header.lvl,
-    plot.fnc,
-    tabset.format,
-    quatro.tabset.bottom,
-    quatro.tabset.top,
-    nl.delim,
-    figure.output.mode,
-    ...){
-    if (length(group.cols) > 1) {
-        group.col <- group.cols[1]
-        group.values <- 
-            plot.df[[group.col]] %>% 
-            as.factor() %>% 
-            droplevels() %>% 
-            levels()
-        cat(nl.delim)
-        # cat(quatro.tabset.top)
-        for (group.value in group.values) {
-            cat(strrep('#', current.header.lvl), group.value, tabset.format)
-            make_tabs_recursive(
-                plot.df=plot.df %>% filter(get({{group.col}}) == group.value),
-                group.cols=group.cols[2:length(group.cols)],
-                current.header.lvl=current.header.lvl + 1,
-                plot.fnc=plot.fnc,
-                tabset.format=tabset.format,
-                quatro.tabset.bottom=quatro.tabset.bottom,
-                quatro.tabset.top= quatro.tabset.top,
-                nl.delim=nl.delim,
-                figure.output.mode=figure.output.mode,
-                ...
-            )
-        }
-        # cat(quatro.tabset.bottom)
-        cat(nl.delim)
-    } else if (length(group.cols) == 1) {
-        cat(nl.delim)
-        cat(quatro.tabset.top)
-        plot_figure_tabs(
-            plot.df=plot.df, 
-            group.col=group.cols[1],
-            header.lvl=current.header.lvl,
-            plot.fnc=plot.fnc,
-            nl.delim=nl.delim,
-            figure.output.mode=figure.output.mode,
-            ...
-        )
-        cat(quatro.tabset.bottom)
-        cat(nl.delim)
-    } else if (length(group.cols) == 0) {
-        figure <- 
-            plot.df %>%
-            plot.fnc(...)
-        if (figure.output.mode == 'rmd') {
-            cat(nl.delim)
-            cat(strrep('#', header.lvl))
-            cat(nl.delim)
-            print(figure)
-            cat(nl.delim)
-        } else if (figure.output.mode == 'return') {
-            return(figure)
-        } else if (figure.output.mode == 'merged') {
-            return(figure)
-        } else {
-            stop(glue('Invalid arg for figure.output.mode: {figure.output.mode}'))
-        }
-    }
-}
-
-make_nested_plot_tabs <- function(
-    plot.df,
-    group.cols,
-    plot.fnc,
-    max.header.lvl=2,
-    add.top.layer=FALSE,
-    tabset.format="{.tabset}",
-    quatro.tabset.top="\n::: {.panel-tabset}\n",
-    quatro.tabset.bottom="\n:::\n",
-    nl.delim="\n\n\n",
-    # nl.delim="",
-    figure.output.mode='rmd',
-    ...){
-    cat(nl.delim)
-    if (add.top.layer) {
-        cat(strrep('#', max.header.lvl), tabset.format, nl.delim)
-        max.header.lvl <- max.header.lvl + 1
-    }
-    cat(quatro.tabset.top)
-    plot.df %>% 
-    make_tabs_recursive(
-        group.cols=group.cols,
-        current.header.lvl=max.header.lvl,
-        plot.fnc=plot.fnc,
-        tabset.format=tabset.format,
-        quatro.tabset.bottom=quatro.tabset.bottom,
-        quatro.tabset.top= quatro.tabset.top,
-        nl.delim=nl.delim,
-        figure.output.mode=figure.output.mode,
-        ...
-    )
-    cat(quatro.tabset.bottom)
-    cat(nl.delim)
 }
 
 ###################################################
