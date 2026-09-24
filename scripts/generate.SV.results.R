@@ -12,7 +12,6 @@ all.sample.metadata <-
 peak.matrices.df <- 
     list_all_ATAC_datasets() %>% 
     filter(CPM.cutoff == '3CPM') %>% 
-    # filter(residual.model == 'KeepDxAge') %>% 
     # hyper-params to select sample subsets for estimating SVs from 
     cross_join(RESIDUAL_MATRIX_SAMPLE_PARAMS_DF) %>%
     cross_join(
@@ -23,8 +22,7 @@ peak.matrices.df <-
     )
 
 ############################################################
-# Compute Surrogate Variables (SVs) and produce corrected matrices
-# generate with different numbers?
+# Estimate Surrogate Variables (SVs) for different count matrices
 ############################################################
 plan(multisession, workers=TOTAL_CORES)
 peak.matrices.df %>% 
@@ -41,9 +39,10 @@ peak.matrices.df %>%
             ),
         results_file=file.path(results_dir, 'peak.residual.SVs.tsv')
     ) %>% 
+    # pmap(
     future_pmap(
         .f=check_cached_results,
-        force_redo=TRUE,
+        # force_redo=TRUE,
         return_data=FALSE,
         results_fnc=run_sva_on_peak_residuals,
         sample.metadata=all.sample.metadata,
@@ -54,7 +53,6 @@ peak.matrices.df %>%
 
 ############################################################
 # Compute LEFs from residuals with varying numbers of SVs regressed out
-peak.matrices.df %>% 
 ############################################################
 # take all input residual matrices
 # map all SV sets to residual matrices they can be applied to + decorate hyper-params
@@ -86,9 +84,6 @@ peak.and.SV.combos.df <-
 plan(multisession, workers=TOTAL_CORES)
 peak.and.SV.combos.df %>% 
     # define output filepath for cluster LEFs
-    left_join(list_all_SVs()) %>%
-    # for each SV i, include up to SVs 1:i and regress out
-    # then run decorate to get CRD peak clusters + scores (LEFs)
     mutate(
         results_dir=
             file.path(

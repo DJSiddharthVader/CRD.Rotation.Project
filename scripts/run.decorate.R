@@ -5,15 +5,16 @@ library(here)
 source(here('scripts', 'basic.imports.R'))
 source(here('scripts', 'utils.decorate.R'))
 # load patient metadata
-sample.metadata <- load_sample_metadata()
+all.sample.metadata <- load_sample_metadata()
 
 ############################################################
 # Generate all input dataset + hyper-param combinations to test
 ############################################################
+        # list_all_SVs() %>% head(1) %>% t()
+        # list_all_SVs()
 all.input.and.parameter.combinations.df <- 
     list_all_ATAC_datasets() %>% 
     filter(CPM.cutoff == '3CPM') %>% 
-    filter(residual.model == 'KeepDxAge') %>% 
     # which sets of samples to use to call CRDs
     cross_join(RESIDUAL_MATRIX_SAMPLE_PARAMS_DF) %>% 
     # map files with estimated SVs to the corresponding residual matrices
@@ -28,31 +29,6 @@ all.input.and.parameter.combinations.df <-
     # cross_join(tibble(SVs.included=c('All', 'None', 'uncorrelated')))
     # cross_join(tibble(SVs.included=c('All', 'None', 'uncorrelated', 5)))
     cross_join(tibble(SVs.included=c('All', 'None')))
-############################################################
-# Compute Surrogate Variables (SVs) and produce corrected matrices
-############################################################
-all.input.and.parameter.combinations.df %>% 
-    mutate(
-        results_dir=
-            file.path(
-                SVA_RESULTS_DIR,
-                glue('CPM.cutoff_{CPM.cutoff}'),
-                glue('residual.model_{residual.model}'),
-                glue('sample.strategy_{sample.strategy}')
-            ),
-        results_file=file.path(results_dir, 'peak.residual.SVs.tsv')
-    ) %>% 
-        # {.} -> tmp; tmp
-        # tmp %>% 
-    pmap(
-        .f=check_cached_results,
-        results_fnc=run_sva_on_peak_residuals,
-        # .f=run_sva_on_peak_residuals,
-        sample.metadata=sample.metadata,
-        full.SV.model.vars=c('AD_CERAD_withDLB', 'Braak_3levels', 'CDR_3levels', 'age'),
-        reduced.SV.model.vars=NULL,
-    )
-# list_all_SVs()
 
 ############################################################
 # Run decorate for each parameter combination
@@ -71,6 +47,8 @@ all.input.and.parameter.combinations.df %>%
                 glue('CPM.cutoff_{CPM.cutoff}'),
                 glue('residual.model_{residual.model}'),
                 glue('sample.strategy_{sample.strategy}'),
+                glue('z.score.counts_{z.score.counts}'),
+                glue('SVs.included_{SVs.included}'),
                 glue('adjacentCount_{adjacentCount}'),
                 glue('method.corr_{method.corr}'),
                 glue('clusterMethod_{clusterMethod}'),
