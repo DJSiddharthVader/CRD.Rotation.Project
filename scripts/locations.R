@@ -14,4 +14,5 @@ SAMPLE_METADATA_RDS_FILEPATH <- file.path(RESIDUALS_DIR, "AllInfo_ATACseq_proces
 SAMPLE_METADATA_TSV_FILEPATH <- here("all.sample.metadata.tsv")
 DECORATE_RESULTS_DIR         <- here("results", "decorate")
 SVA_RESULTS_DIR              <- here("results", "peak.SVs")
+ELBOW_RESULTS_DIR            <- here("results", "elbow.data")
 CRD_RESULTS_DIR              <- here("results", "decorate.CRDs")

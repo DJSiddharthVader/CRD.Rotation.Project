@@ -1,7 +1,7 @@
 ############################################################
 # Constants
 ############################################################
-NUM_SVS_TO_GENERATE <- 10
+NUM_SVS_TO_GENERATE <- 14 # number of OCRs / number of samples
 AD_PHENOTYPE_COLUMNS <- 
     c(
         'AD_CERAD_withDLB', 
