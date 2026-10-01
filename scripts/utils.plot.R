@@ -12,7 +12,8 @@ suppressPackageStartupMessages({
     # library(viridis)
     library(ComplexUpset)
     library(quarto)
-    library(quartabs)
+    # library(quartabs)
+    # source(here('scripts', 'custom.render.tabset.R'))
 })
 
 ###################################################
@@ -435,6 +436,160 @@ post_process_plot <- function(
             .
         }
     }
+}
+
+###################################################
+# Modified quartabs render_tabset() function
+###################################################
+buffer_nls <- function(stri, nl.delim='\n') {
+    cat(nl.delim)
+    cat(stri)
+    cat(nl.delim)
+}
+
+make_heading <- function(label, level) {
+  stopifnot(
+    "`level` must be an integer from 1 through 7." =
+      length(level) == 1L &&
+        !is.na(level) &&
+        level == as.integer(level) &&
+        level >= 1L &&
+        level <= 7L
+  )
+
+  paste0(
+    strrep("#", as.integer(level)),
+    " ",
+    as.character(label)
+  )
+}
+
+make_tabset_div <- function(
+    pills=FALSE,
+    tabset_width="default") {
+    stopifnot(
+    "`pills` must be a single logical value." =
+        is.logical(pills) &&
+            length(pills) == 1L &&
+            !is.na(pills),
+    "`tabset_width` must be one of 'default', 'fill', or 'justified'." =
+        is.character(tabset_width) &&
+            length(tabset_width) == 1L &&
+            !is.na(tabset_width) &&
+            tabset_width %in% c("default", "fill", "justified")
+    )
+    classes <- ".panel-tabset"
+    if (isTRUE(pills)) {
+    classes <- c(classes, ".panel-tabset-pills")
+    }
+    if (identical(tabset_width, "fill")) {
+    classes <- c(classes, ".panel-fill")
+    }
+    if (identical(tabset_width, "justified")) {
+    classes <- c(classes, ".panel-tabset-justified")
+    }
+    paste0("::: {", paste(classes, collapse = " "), "}")
+}
+
+render_tabsets_basecase <- function(
+    data,
+    output_var,
+    current.variable, 
+    hlevel,
+    nl.delim,
+    ...){
+    # pirnt all output variables specified under each level heading for this variable
+    data %>%
+        nest(output=-all_of(current.variable)) %>%
+        mutate(current.level=!!sym(current.variable)) %>% 
+        pmap(
+            .l=.,
+            .f=
+                function(current.level, output, ...) {
+                    make_heading(current.level, hlevel) %>% buffer_nls(nl.delim=nl.delim)
+                    output %>%
+                    pull(output_var) %>% 
+                    print()
+                }
+        )
+}
+
+render_tabsets_recursively <- function(
+    data,
+    tabset_vars,
+    output_var,
+    hlevel,
+    layout,
+    pills,
+    tabset_width,
+    nl.delim,
+    ...){
+    current.variable <- tabset_vars[1]
+    if (!is.null(layout)) { layout %>% buffer_nls(nl.delim=nl.delim) }
+    make_tabset_div(pills=pills, tabset_width=tabset_width) %>%  buffer_nls(nl.delim=nl.delim)
+    make_heading(current.variable, hlevel) %>% buffer_nls(nl.delim=nl.delim)
+    if (length(tabset_vars) == 1) {
+        render_tabsets_basecase(
+            data=data,
+            output_var=output_var,
+            current.variable=current.variable,
+            hlevel=hlevel+1,
+            nl.delim=nl.delim
+        )
+    # recursive case, keep descending + printing titles until the bottom is reached
+    } else {
+            data[[current.variable]] %>%
+            unique() %>%
+            list() %>% 
+            pmap(
+                .l=.,
+                .f=render_tabsets_recursively,
+                # data=data %>% filter(data[[current.variable]] == current.level),
+                data=data,
+                tabset_vars=tabset_vars[2:length(tabset_vars)],
+                output_var=output_var,
+                hlevel=hlevel+1,
+                layout=layout,
+                pills=pills,
+                tabset_width=tabset_width,
+                nl.delim=nl.delim,
+                ...
+            )
+    }
+    ":::" %>% buffer_nls(nl.delim=nl.delim)
+    if (!is.null(layout)) { sub("^(:+).*", "\\1", layout) %>%  buffer_nls(nl.delim=nl.delim) }
+}
+
+custom_render_tabset <- function(
+    data,
+    tabset_vars,
+    output_var='figures',
+    starting.hlevel=2,
+    nl.delim='\n',
+    layout=NULL,
+    pills=FALSE,
+    tabset_width="default",
+    ...){
+    # get nesting info
+    current.variable <- tabset_vars[1]
+    # print quarto section headers 
+    if (!is.null(layout)) { layout %>% buffer_nls(nl.delim=nl.delim) }
+    make_tabset_div(pills=pills, tabset_width=tabset_width) %>% buffer_nls(nl.delim=nl.delim)
+    make_heading(current.variable, starting.hlevel) %>% buffer_nls(nl.delim=nl.delim)
+    render_tabsets_recursively(
+        data=data,
+        tabset_vars=tabset_vars[2:length(tabset_vars)],
+        output_var=output_var,
+        current.variable=current.variable,
+        hlevel=starting.hlevel+1,
+        layout=layout,
+        pills=pills,
+        tabset_width=tabset_width,
+        nl.delim=nl.delim,
+        ...
+    )
+    ":::" %>% buffer_nls(nl.delim=nl.delim)
+    if (!is.null(layout)) { sub("^(:+).*", "\\1", layout) %>%  buffer_nls(nl.delim=nl.delim) }
 }
 
 ###################################################
