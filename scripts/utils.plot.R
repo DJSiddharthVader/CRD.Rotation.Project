@@ -1036,6 +1036,52 @@ plot_lineplot <- function(
     )
 }
 
+plot_ribbonplot <- function(
+    plot.df,
+    x.var='',
+    y.var='',
+    ymin.var='',
+    ymax.var='',
+    color.var=NULL, 
+    alpha=0.5,
+    size=0.5,
+    linewidth=1,
+    scales='fixed',
+    ...){
+    # x.var='start'; x.scale.mode='mb'; y.var='nesting.lvl'; group.var='Sample.Group'; color.var='Genotype'; shape.var='Genotype'; facet.row='Edit';
+    # make it a lineplot plot
+    {
+        ggplot(
+            plot.df,
+            aes(
+                # group=.data[[group.var]],
+                x=.data[[x.var]],
+                y=.data[[y.var]],
+                ymin=.data[[ymin.var]],
+                ymax=.data[[ymax.var]]
+            )
+        )
+    } %>% 
+    {
+        if (!is.null(color.var)) {
+            . + 
+            geom_ribbon(aes(fill=.data[[color.var]]), alpha=alpha) +
+            geom_point(aes(color=.data[[color.var]]), size=size) +
+            geom_line(aes(color=.data[[color.var]]), linewidth=linewidth) 
+        } else {
+            . + 
+            geom_ribbon(alpha=alpha) +
+            geom_point(size=size) +
+            geom_line(linewidth=linewidth) 
+        }
+    } %>% 
+    # Handle faceting + scaling + theme options
+    post_process_plot(
+        scales=scales,
+        ...
+    )
+}
+
 plot_pointdensity <- function(
     plot.df,
     x.var='',
