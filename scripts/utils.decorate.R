@@ -277,18 +277,36 @@ run_varaincePartition <- function(
     peak.residuals.mx,
     sample.metadata,
     model.formula,
+    SVs.included=0,
+    BPPARAM=SerialParam(),
+    p=NULL,
     ...){
-    fitExtractVarPartModel(
-        exprObj=peak.residuals.mx,
-        form=model.formula,
-        data=sample.metadata,
-        ...
-        # showWarnings=FALSE,
-        # hideErrorsInBackend=TRUE,
-    ) %>%
-    as.data.frame() %>%
-    rownames_to_column('PeakID') %>%
-    as_tibble()
+    # peak.residuals.mx=peak.data$residuals
+    common.samples <- 
+        colnames(peak.residuals.mx) %>%
+        intersect(rownames(sample.metadata))
+    # residualize SVs out of input matrix before running variancePartition()
+    peak.residuals.mx <-
+        residualize_SVs(
+            SVs.included=SVs.included,
+            SVs.df=sample.metadata[common.samples, ],
+            residuals.mx=peak.residuals.mx[, common.samples]
+        )
+    # print formula 
+    message(model.formula)
+    # estiamte how much each formula variable contributes to variance in each 
+    # peak's abundance in the residualized matrix
+    vps.df <- 
+        fitExtractVarPartModel(
+            form=model.formula,
+            exprObj=peak.residuals.mx[, common.samples],
+            data=sample.metadata[common.samples, ],
+            ...
+        ) %>% 
+        rownames_to_column('PeakID') %>% 
+        as_tibble()
+    if (!is.null(p)) { p() }
+    return(vps.df)
 }
 
 generate_SV_varpar_results <- function(
@@ -300,40 +318,63 @@ generate_SV_varpar_results <- function(
     SVs.filepath,
     model.variables,
     ...){
+    # paste0(c('row.index=1; model.variables=RELEVANT_METADATA_COLUMNS; BPPARAM=SnowParam(TOTAL_CORES * (4 / 5));', paste0(colnames(tmp), '=tmp$', colnames(tmp), '[[row.index]]', collapse='; ')), collapse='; ')
+    # load + subset data according to specified params
     peak.data <- 
         subset_peak_data(
             residuals.filepath=residuals.filepath,
             coords.filepath=coords.filepath,
-            sample.metadata=sample.metadata,
+            sample.metadata=all.sample.metadata,
             AD.definition.column=AD.definition.column,
             sample.strategy=sample.strategy
         )
-    # estimate SVs from peak residuals 
-    SVs.df <- 
-        SVs.filepath %>% 
+    # join SVs with sample metadata for variancePartition
+    sample.metadata <- 
+        # Load SVs to residualize out
+        SVs.filepath %>%
         read_tsv(show_col_types=FALSE) %>%
-        left_join(all.sample.metadata, by='SampleID') %>% 
         as.data.frame() %>%
+        # match SVs with sample metadata + phenotypes
+        merge(as.data.frame(peak.data$sample.metadata), by='SampleID') %>%
         column_to_rownames('SampleID')
-
-    all.SVs <- SVs.df %>% colnames() %>% grep('^SV', ., value=TRUE)
-    tibble(SVs.included=0:length(all.SVs)) %>%
+    # run variancePartition with the formula ~ model.variables + SV1 + ... + SVi
+    # build model formula automatically from provided SVs
+    SV.variables <- 
+        sample.metadata %>% colnames() %>% grep('^SV', ., value=TRUE)
+    model.formula <- 
+        # metadata to include in the formula for variancePartition
+        pmap_lgl(
+            .l=list(model.variables),
+            # automatically remove any variables that are uniform across all samples 
+            .f=~ length(unique(sample.metadata[[.x]])) != 1
+        ) %>% 
+        {model.variables[.]} %>% 
+        c(SV.variables) %>% 
+        paste0(collapse='+') %>% 
+        sprintf('~ %s', .) %>% 
+        formula()
+    # want to compare how variances explained for model.variable changes across 
+    # different number of SVs incorporated, also a kind of elbow analysis
+    # tmp[row.index, ] %>% cross_join(tibble(SVs.included=0:length(SV.variables))) %>% 
+    tibble(SVs.included=0:length(SV.variables)) %>%
     mutate(
-        model.formula=
-            paste0(c(model.variables, all.SVs[0:SVs.included], collapse='+')) %>% 
-            sprintf('~ %s', .) %>%
-            formula(),
         variancePartitionResults=
             future_pmap(
-            # pmap(
                 .l=.,
                 .f=run_varaincePartition,
-                ...,
                 peak.residuals.mx=peak.data$residuals,
-                sample.metadata=SVs.df
+                ..., 
+                model.formula=model.formula,
+                sample.metadata=sample.metadata,
+                hideErrorsInBackend=TRUE, showWarnings=TRUE,
+                p=progressor(label='SVs included', steps=length(SV.variables)),
                 .progress=TRUE
-            )
-    ) %>%
+            ) 
+    ) %>% 
+    add_column(
+        total.SVs=length(SV.variables),
+        model.variables=paste0(model.variables, collapse=', ')
+    ) %>% 
     unnest(variancePartitionResults)
 }
 

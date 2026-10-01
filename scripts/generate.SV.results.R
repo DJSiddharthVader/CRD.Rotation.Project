@@ -43,13 +43,12 @@ peak.matrices.df %>%
     future_pmap(
         .f=check_cached_results,
         # force_redo=TRUE,
-        return_data=FALSE,
         results_fnc=run_sva_on_peak_residuals,
         sample.metadata=all.sample.metadata,
         full.SV.model.vars=ALL_PHENOTYPE_COLUMNS,
         reduced.SV.model.vars=NULL,
         .progress=TRUE
-    )
+    ) 
 
 ############################################################
 # Compute LEFs from residuals with varying numbers of SVs regressed out
@@ -60,6 +59,7 @@ peak.and.SV.combos.df <-
     peak.matrices.df %>% 
     # match them to all sets of SVs produced
     inner_join(
+        list_all_results_files_in_set(set.name='SVs'),
         list_all_SVs(),
         by=
             join_by(
@@ -76,6 +76,7 @@ peak.and.SV.combos.df <-
     # so if I=min(N,M) then cor(A[1..I], B[1..I] ~= 1 so 
     # we can just use the single largest set of SV estimates and vary how many SVs we residualize out ({1..N},{1..M})
     # to titrate the effects of SVs (instead of also measuring across SV sets ({A,B})
+    filter(n.SVs == NUM_SVS_TO_GENERATE)
     filter(n.SVs == NUM_SVS_TO_GENERATE) %>% 
     # match against all combinations of hyper-params for decorate
     cross_join(DECORATE_HYPER_PARAMS_DF)
@@ -120,9 +121,7 @@ peak.and.SV.combos.df %>%
     )
 
 ############################################################
-# variancePartition analysis showing how much variance contributions from metadata change pre/post
-# SV residualizing and what the SV contributions are
-# Should repeat across SV titrations (i.e. increasing number of included SVs separately)
+# Compute variancePartition() of metadata and SVs  pre/post SV residualizing
 ############################################################
 plan(multisession, workers=TOTAL_CORES)
 peak.matrices.df %>% 
@@ -130,32 +129,27 @@ peak.matrices.df %>%
     mutate(
         results_dir=
             file.path(
-                ELBOW_RESULTS_DIR,
+                SV_VARIANCEPARTITION_RESULTS_DIR,
                 glue('CPM.cutoff_{CPM.cutoff}'),
                 glue('residual.model_{residual.model}'),
                 glue('AD.definition.column_{AD.definition.column}'),
                 glue('sample.strategy_{sample.strategy}'),
-                glue('n.SVs_{n.SVs}'),
                 glue('z.score.counts_{z.score.counts}'),
-                glue('adjacentCount_{adjacentCount}'),
-                glue('method.corr_{method.corr}'),
-                glue('clusterMethod_{clusterMethod}'),
-                glue('filterMetric_{filterMetric}'),
-                glue('filterMetricCutoff_{filterMetricCutoff}'),
-                glue('jaccardCutoff_{jaccardCutoff}')
+                glue('n.SVs_{n.SVs}')
             ),
-        # results_file=file.path(results_dir, 'elbow.cluster.data.tsv')
         results_file=file.path(results_dir, 'SV.variance.partition.results.tsv')
     ) %>% 
     # for each SV i, include up to SVs 0:i and regress out -> varPar on SV-regressed out matrix
-    future_pmap(
+    pmap(
         .l=.,
         .f=check_cached_results,
-        return_data=FALSE,
         # force_redo=TRUE,
-        silence=TRUE,
+        return_data=FALSE,
         results_fnc=generate_SV_varpar_results,
         all.sample.metadata=all.sample.metadata,
+        model.variables=RELEVANT_METADATA_COLUMNS,
+        BPPARAM=SnowParam(N_CORES_PER_PROCESS),
         .progress=TRUE
 
-    )
+    ) 
+
