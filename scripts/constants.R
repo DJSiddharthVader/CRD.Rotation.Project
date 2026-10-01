@@ -13,6 +13,15 @@ ALL_PHENOTYPE_COLUMNS <-
         AD_PHENOTYPE_COLUMNS,
         'age'
     )
+RELEVANT_METADATA_COLUMNS <- 
+    c(
+        AD_PHENOTYPE_COLUMNS,
+        'age',
+        'PMI_mins',
+        'Biobank',
+        'sex',
+        'RACE'
+    )
 
 ############################################################
 # Hyper-param combinations
