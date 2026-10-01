@@ -84,9 +84,9 @@ subset_peak_data <- function(
     # peak.locations.gr <- peak.locations.gr[peaks.to.keep, ]
     # peak.residuals.mx <- peak.residuals.mx[peaks.to.keep, samples.to.keep]
     list(
+        sample.metadata=sample.metadata %>% filter(SampleID %in% samples.to.keep),
         residuals=peak.residuals.mx[peaks.to.keep, samples.to.keep],
-        locations=peak.locations.gr[peaks.to.keep, ],
-        sample.metadata=sample.metadata %>% filter(SampleID %in% samples.to.keep)
+        locations=peak.locations.gr[peaks.to.keep, ]
     )
 }
 
@@ -141,9 +141,9 @@ run_sva <- function(
             n.SVs == 'be'   ~ num.sv(dat=counts, mod=mod, method='be'),
             TRUE            ~ as.integer(n.SVs)
         )
-    print(full.fml)
-    print(reduced.fml)
-    # print(c(n.SVs, n.sv))
+    message(full.fml)
+    message(reduced.fml)
+    # message(c(n.SVs, n.sv))
     # Run SVA to estimate SVs as specified from the count matrix
     sva(
         dat=counts,
@@ -196,7 +196,6 @@ run_sva_on_peak_residuals <- function(
     }
     # estimate SVs from peak residuals 
     run_sva(
-        # counts.matrix=peak.data$residuals[1:1000, sample.metadata$SampleID],
         counts.matrix=peak.data$residuals[, sample.metadata$SampleID],
         sample.metadata=sample.metadata,
         full.model=full.SV.model.vars,
@@ -216,12 +215,10 @@ list_all_SVs <- function(){
     select(-c(filename))
 }
 
-adjust_residuals_with_svs <- function(
+residualize_out_specified_SVs <- function(
     peak.residuals.mx,
     SVs.df,
-    SVs.included=NULL,
-    # cores=1,
-    ...){
+    SVs.included=NULL){
     # peak.residuals.mx=peak.data$residuals; SVs.df=SVs.df; SVs.included=NULL
     if (is.null(SVs.included)) { SVs.included <- c(colnames(SVs.df)) }
     model.formula <- 
@@ -234,7 +231,6 @@ adjust_residuals_with_svs <- function(
         formula()
     common.samples <- 
         intersect(rownames(SVs.df), colnames(peak.residuals.mx))
-    # model.formula %>% print()
     # Regress out SVs
     # peak.residuals.mx[, common.samples, drop=FALSE] %>% 
     peak.residuals.mx[, common.samples] %>% 
@@ -246,6 +242,29 @@ adjust_residuals_with_svs <- function(
     ) %>%
     residuals(peak.residuals.mx[, common.samples])
     # residuals(peak.residuals.mx[, common.samples, drop=FALSE])
+}
+
+residualize_SVs <- function(
+    SVs.included,
+    SVs.df,
+    residuals.mx){
+    if (SVs.included == 0) {
+        message('Not regressing out any SVs before running decorate')
+        residuals.mx
+    } else if (SVs.included > 0) { 
+        SV.variables <- 
+            SVs.df %>% colnames() %>% grep('^SV', ., value=TRUE)
+        SVs.included <- 
+            min(SVs.included, length(SV.variables))
+        message(glue('Regressing out {SVs.included} SVs before running decorate'))
+        residualize_out_specified_SVs(
+            peak.residuals.mx=residuals.mx,
+            SVs.df=SVs.df,
+            SVs.included=SV.variables[1:SVs.included]
+        )
+    } else {
+        stop(glue('Invalid arg to SVs.included: {SVs.included}'))
+    }
 }
 
 generate_elbow_data <- function(
@@ -510,67 +529,25 @@ run_decorate_pipeline <- function(
             AD.definition.column=AD.definition.column,
             sample.strategy=sample.strategy
         )
-    # estimate SVs from peak residuals 
-    SVs.df <- 
-        SVs.filepath %>%
-        read_tsv(show_col_types=FALSE) %>%
-        as.data.frame() %>%
-        column_to_rownames('SampleID')
-    # regress out SVs from residuals
-    total.SVs <- ncol(SVs.df)
-    if (SVs.included == 'All' | SVs.included > total.SVs) { 
-        message('Regressing out all SVs before running decorate')
-        SV.adjusted.peak.residuals.mx <- 
-            adjust_residuals_with_svs(
-                peak.residuals.mx=peak.data$residuals,
+    # Load SVs to residualize out 
+    if (SVs.included > 0) {
+        SVs.df <- 
+            SVs.filepath %>%
+            read_tsv(show_col_types=FALSE) %>%
+            as.data.frame() %>%
+            column_to_rownames('SampleID')
+        peak.residuals.mx <-
+            residualize_SVs(
                 SVs.df=SVs.df,
-                SVs.included=colnames(SVs.df)
+                residuals.mx=peak.data$residuals,
+                SVs.included=SVs.included
             )
-    } else if (SVs.included <= total.SVs & SVs.included > 0) { 
-        message(glue('Regressing out {SVs.included} SVs before running decorate'))
-        SV.adjusted.peak.residuals.mx <- 
-            adjust_residuals_with_svs(
-                peak.residuals.mx=peak.data$residuals,
-                SVs.df=SVs.df,
-                SVs.included=colnames(SVs.df)[1:SVs.included]
-            )
-    # } else if (SVs.included == 'uncorrelated') { 
-    #     message(glue('Regressing out SVs with < {SV.cor.thresh} correlation with any variables'))
-    #     SV.formula.correlations <-
-    #         sample.metadata %>%
-    #         select(c('SampleID', SV.cor.filter.variables)) %>% 
-    #         left_join(SVs.df %>% rownames_to_column('SampleID') %>% as_tibble(), by='SampleID') %>% 
-    #         canCorPairs(
-    #             # formula=sprintf('~%s', paste(SV.cor.filter.variables, colnames(SVs.df), collapse='+')),
-    #             formula=
-    #                 paste(
-    #                     paste(SV.cor.filter.variables, collapse='+'),
-    #                     '~',
-    #                     paste(colnames(SVs.df), collapse='+')
-    #                 ) %>%
-    #                 formula(),
-    #             data=.
-    #         ) %>%
-    #         rownames_to_column('SVs') %>% 
-    #         pivot_longer(-c(SVs), names_to='model.vars', value_to='corr')
-    #     SVs.included <-
-    #         SV.formula.correlations %>% 
-    #         filter(corr < SV.cor.thresh) %>%
-    #         pull(SVs)
-    #     message(glue('Using the following uncorrelated SVs: {paste(SVs.included, collapse=", ")}'))
-    #     SV.adjusted.peak.residuals.mx <- 
-    #         adjust_residuals_with_svs(
-    #             peak.residuals.mx=peak.data$residuals,
-    #             SVs.df=SVs.df,
-    #             SVs.included=SVs.included
-    #         )
-    } else if (SVs.included == 'None' | SVs.included == 0) {
-        message('Not regressing out any SVs before running decorate')
-        SV.adjusted.peak.residuals.mx <- peak.data$residuals
+    } else  if (SVs.included == 0) {
+        peak.residuals.mx <- 
+            peak.data$residuals
     } else {
-        stop(glue('Invalid arg to SVs.included: {SVs.included}'))
+        stop(glue('SVs.included must be an integer, passed: {SVs.included}'))
     }
-    # generate peak clusters
     # SV.adjusted.peak.residuals.mx %>% as.data.frame() %>% rownames_to_column('PeakID')
     if (LEFs.only) {
         generate_LEFs_only_with_decorate(
