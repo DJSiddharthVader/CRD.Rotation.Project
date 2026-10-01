@@ -21,14 +21,18 @@ Load SVs and sample data
 ```{r load_data}
 all.sample.metadata <- 
     load_sample_metadata() %>%
-    select(SampleID, sex, age, RACE, Biobank, PMI_mins, AD_CERAD_withDLB, Braak_3levels, CDR_3levels)
+    select(all_of(c('SampleID', RELEVANT_METADATA_COLUMNS)))
+```
+
+Load all SVs
+```{r load_SV_data}
 all.SVs.df <- 
     check_cached_results(
         results_file=here('results', 'all.SV.data.rds'),
-        force_redo=TRUE,
+        # force_redo=TRUE,
         results_fnc=
             function() {
-                list_all_SVs() %>%
+                list_all_results_files_in_set(set.name='SVs') %>% 
                 mutate(
                     SVs.df=
                         future_pmap(
@@ -94,7 +98,7 @@ compute_SV_correlations <- function(SVs.df.1, SVs.df.2, ...) {
         values_to='cor'
     )
 }
-compute_all_SV_correlations <- function(){
+compute_all_SV_correlations <- function(all.SVs.df){
     tribble(
         ~AD.definition.column, ~sample.strategy.1, ~sample.strategy.2, 
         'AD_CERAD_withDLB',    'All.Samples',      'All.Samples',
@@ -134,9 +138,10 @@ compute_all_SV_correlations <- function(){
 }
 SV.correlations.df <- 
     check_cached_results(
-        results_file=here('results', 'all.SV.data.tsv'),
-        force_redo=TRUE,
-        results_fnc=compute_all_SV_correlations
+        results_file=file.path(NOTEBOOK_CACHE_DIR, 'all.SV.data.tsv'),
+        # force_redo=TRUE,
+        results_fnc=compute_all_SV_correlations,
+        all.SVs.df=all.SVs.df
     ) %>% 
     mutate(
         cor.label=round(cor, 2),
@@ -159,61 +164,68 @@ SV.correlations.df <-
 Here we plot the correlation of SVs estimated on different set of samples, specifically we compare SVs estimated from AD samples only or Controls only to All samples.
 We only compare the SV correlations between common samples for each pair of different SV sets.
 
-```{r plot_SV_SV_correlation_qartabs}
+```{r plot_SV_SV_correlation}
 #| echo: false
 #| results: asis
-#| output: asis 
 #| fig-width: 15
 #| fig-height: 15
 # Now plot correlation of SVs across datasets
-nesting.vars <- c('CPM.cutoff', 'residual.model', 'comparison', 'z.score.counts')
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model',
+        'comparison',
+        'z.score.counts'
+    )
 SV.correlations.df %>% 
-# # only compare SVs esstimated on the same sample sets
-# filter(comparison == sample.strategy.1) %>% 
-nest(plot.df=-all_of(nesting.vars)) %>% 
-mutate(
-    figures=
-        pmap(
-            .l=.,
-            .f=plot_heatmap,
-            facet.col='SVs.estimated.1',
-            facet.row='SVs.estimated.2',
-            x.var='SVs.1',
-            y.var='SVs.2',
-            fill.var='cor', 
-            # label.var='cor.label',
-            # label.size=2,
-            # label.color='black',
-            scales='free',
-            space='free',
-            # independent='all',
-            fill.axis.label.accuracy=0.01,
-            plot.elements=list(scale_fill_gradient2(low="red", mid="lightgrey", high="blue", midpoint=0)),
-            axis.text.x=element_text(angle=45, vjust=1, hjust=1),
-            axis.line=element_blank(),
-            axis.title=element_blank(),
-            .progress=TRUE
-        )
-) %>% 
-render_tabset(
-    tabset_vars=nesting.vars,
-    output_vars=figures
-)
-cat(':::')
+    # # only compare SVs esstimated on the same sample sets
+    # filter(comparison == sample.strategy.1) %>% 
+    nest(plot.df=-all_of(nesting.vars)) %>% 
+    mutate(
+        test=pmap(.l=list(plot.df), .f=~ glue('{nrow(.x)}x{ncol(.x)}')),
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_heatmap,
+                facet.col='SVs.estimated.1',
+                facet.row='SVs.estimated.2',
+                x.var='SVs.1',
+                y.var='SVs.2',
+                fill.var='cor', 
+                # label.var='cor.label',
+                # label.size=2,
+                # label.color='black',
+                scales='free',
+                space='free',
+                # independent='all',
+                fill.axis.label.accuracy=0.01,
+                plot.elements=list(scale_fill_gradient2(low="red", mid="lightgrey", high="blue", midpoint=0)),
+                axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+                axis.line=element_blank(),
+                axis.title=element_blank(),
+                .progress=TRUE
+            )
+    ) %>% 
+        {.} -> tmp; ggsave(here('test.pdf'), tmp$figures[[1]])
+    custom_render_tabset(
+        tabset_vars=nesting.vars,
+        output_var='figures'
+        # output_var='test'
+    )
+    # render_tabset(
+    #     # tabset_vars=nesting.vars,
+    #     # heading_levels=c(1, rep(NA, length(nesting.vars))),
+    #     # tabset_vars=c('title', nesting.vars),
+    #     starting.hlevel=2,
+    #     tabset_vars=nesting.vars,
+    #     output_vars='figures'
+    # )
 ```
 
 # Correlation of SVs and Sample Metadata
 
 ```{r compute_SV_metadata_correlation}
 # #| eval: false
-#| cache: true
-model.variables <- 
-    c(
-        'RACE',
-        'sex',
-        'Biobank',
-        ALL_PHENOTYPE_COLUMNS
-    )
 make_correlation_data <- function(SVs.df, model.vars, ...) {
     # SVs.df=all.SVs.df$SVs.df[[1]]; model.vars=c('sex', 'RACE', 'Biobank', ALL_PHENOTYPE_COLUMNS)
     for (variable in model.vars) {
@@ -241,10 +253,9 @@ make_correlation_data <- function(SVs.df, model.vars, ...) {
         -c(Var1),
         names_to='Var2',
         values_to='corr'
-    ) %>% 
-    mutate(across(c(Var1, Var2), ~ factor(.x, levels=all.vars)))
+    )
 }
-compute_all_SV_metadata_correlations <- function(model.variables) {
+compute_all_SV_metadata_correlations <- function(all.SVs.df, model.variables) {
     all.SVs.df %>% 
     mutate(
         corr.df=
@@ -257,39 +268,63 @@ compute_all_SV_metadata_correlations <- function(model.variables) {
     select(-SVs.df) %>% 
     unnest(corr.df)
 }
-SV.metadata.correlations.df <- 
-    check_cached_results(
-        results_file=here('results', 'all.SV.metadata.correlations.tsv'),
-        force_redo=TRUE,
-        results_fnc=compute_all_SV_metadata_correlations,
-        model.variables=model.variables
-    ) %>% 
+factorize_for_plotting <- function(SV.correlations.df){
+    all.vars <- 
+        c(SV.correlations.df$Var1, SV.correlations.df$Var2) %>%
+        unique() %>%
+        {
+            c(
+                grep('^SV', ., value=TRUE, invert=TRUE) %>% sort(),
+                grep('^SV', ., value=TRUE) %>% {.[as.integer(str_remove(., 'SV'))]}
+            )
+        }
+    SV.correlations.df %>% 
+    mutate(across(c(Var1, Var2), ~ factor(.x, levels=all.vars))) %>% 
     mutate(
+        Var1.ordered=
+            case_when(
+                as.integer(Var1) <= as.integer(Var2) ~ Var1,
+                as.integer(Var1) >  as.integer(Var2) ~ Var2
+            ),
+        Var2.ordered=
+            case_when(
+                as.integer(Var1) <= as.integer(Var2) ~ Var2,
+                as.integer(Var1) >  as.integer(Var2) ~ Var1
+            ),
         across(
             .cols=c(Var1, Var2),
-            .names='{.col}.is.SV',
-            .f=~ !.x %in% model.variables
-        )
-    ) %>% 
-    filter(Var1.is.SV != Var2.is.SV) %>% 
-    mutate(
-        SVs=
+            .names='{.col}.label',
+            .f=
+                ~ case_when(
+                    grepl('^SV', .x) ~ 'SV',
+                    .x %in% all.vars ~ 'phenotype'
+                ) %>% 
+                factor()
+        ),
+        var.comparison=
             case_when(
-                 Var1.is.SV & !Var2.is.SV ~ Var1,
-                !Var1.is.SV &  Var2.is.SV ~ Var2
-            ),
-        phenotypes=
-            case_when(
-                 Var1.is.SV & !Var2.is.SV ~ Var2,
-                !Var1.is.SV &  Var2.is.SV ~ Var1
-            ),
-        SVs=fct_reorder(SVs, SVs %>% str_remove('^SV') %>% as.integer()),
-        corr.label=round(corr, 2)
+                as.integer(Var1.label)  > as.integer(Var2.label) ~ glue('{Var1.label} vs {Var2.label}'),
+                as.integer(Var1.label)  < as.integer(Var2.label) ~ glue('{Var2.label} vs {Var1.label}'),
+                as.integer(Var1.label) == as.integer(Var2.label) ~ glue('within {Var1.label}'),
+                .default='???'
+            )
     ) %>%
-    select(-c(Var1, Var1.is.SV, Var2, Var2.is.SV))
+    select(-c(Var1, Var2)) %>%
+    dplyr::rename_with(~ str_remove(.x, '.ordered')) %>%
+    select(-c(ends_with('.label')))
+}
+SV.metadata.correlations.df <- 
+    check_cached_results(
+        results_file=file.path(NOTEBOOK_CACHE_DIR, 'all.SV.metadata.correlations.tsv'),
+        # force_redo=TRUE,
+        results_fnc=compute_all_SV_metadata_correlations,
+        all.SVs.df=all.SVs.df
+    ) %>% 
+    filter(SVs.estimated == NUM_SVS_TO_GENERATE) %>% 
+    factorize_for_plotting()
 ```
 
-Here we plot the correlation of estimated SVs with various sample characteristics e.g. AD phenotypes, Age and model co-variates.
+Here we plot the correlation of estimated SVs with various sample characteristics e.g. AD phenotypes, Age and model co-variates. We previously showed that 
 
 ```{r plot_SV_metadata_correlation}
 # #| eval: false
@@ -298,34 +333,51 @@ Here we plot the correlation of estimated SVs with various sample characteristic
 #| output: asis 
 #| fig-width: 15
 #| fig-height: 15
-nesting.vars <- c('CPM.cutoff', 'residual.model', 'z.score.counts', 'sample.strategy')
+
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model',
+        'AD.definition.column',
+        'sample.strategy',
+        'z.score.counts'
+    )
 SV.metadata.correlations.df %>% 
-nest(plot.df=-all_of(nesting.vars)) %>% 
-mutate(
-    figures=
-        pmap(
-            .l=.,
-            .f=plot_heatmap,
-            facet.group='SVs.estimated', facet.ncol=7,
-            y.var='SVs',
-            x.var='phenotypes',
-            fill.var='corr', 
-            label.var='corr.label',
-            label.size=2,
-            label.color='white',
-            scales='free',
-            space='free',
-            # independent=TRUE,
-            axis.text.x=element_text(angle=45, vjust=1, hjust=1),
-            axis.line=element_blank(),
-            axis.title=element_blank(),
-            .progress=TRUE
-        )
-) %>% 
-render_tabset(
-    tabset_vars=nesting.vars,
-    output_vars=figures
-)
+    mutate(corr.label=round(corr, 2)) %>% 
+    filter(SVs.estimated == NUM_SVS_TO_GENERATE) %>% 
+    # nest(plot.df=-all_of(c(nesting.vars, 'residual.model', 'sample.strategy'))) %>% 
+    nest(plot.df=-all_of(c(nesting.vars))) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_heatmap,
+                # facet.group='SVs.estimated', facet.ncol=7,
+                # facet.col='sample.strategy', facet.row='residual.model'
+                facet.col='var.comparison',
+                y.var='Var2',
+                x.var='Var1',
+                fill.var='corr', 
+                label.var='corr.label',
+                label.size=2,
+                label.color='white',
+                scales='free',
+                # space='free',
+                independent='all',
+                axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+                axis.line=element_blank(),
+                axis.title=element_blank(),
+                .progress=TRUE
+            )
+    ) %>% 
+    add_column(title='Correlation of SVs and Sample Metadata') %>% 
+    render_tabset(
+        # heading_levels=c(1, rep(NA, length(nesting.vars))),
+        # tabset_vars=c('title', nesting.vars),
+        starting.hlevel=2,
+        tabset_vars=nesting.vars,
+        output_vars='figures'
+    )
 ```
 
 # variancePartition Analysis

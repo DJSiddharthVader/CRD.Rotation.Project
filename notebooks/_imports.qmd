@@ -18,7 +18,8 @@ knitr::opts_chunk$set(
 #| include: false
 library(here)
 source(here('scripts', 'basic.imports.R'))
-source(here('scripts', 'utils.decorate.R'))
+# source(here('scripts', 'utils.decorate.R'))
 source(here('scripts', 'utils.plot.R'))
+library(variancePartition) # for canCorPairs
 ```
 
