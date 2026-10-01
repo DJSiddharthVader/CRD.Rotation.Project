@@ -10,17 +10,21 @@ all.sample.metadata <- load_sample_metadata()
 ############################################################
 # Generate all input dataset + hyper-param combinations to test
 ############################################################
-        # list_all_SVs() %>% head(1) %>% t()
-        # list_all_SVs()
 all.input.and.parameter.combinations.df <- 
     list_all_ATAC_datasets() %>% 
     filter(CPM.cutoff == '3CPM') %>% 
     # which sets of samples to use to call CRDs
     cross_join(RESIDUAL_MATRIX_SAMPLE_PARAMS_DF) %>% 
     # map files with estimated SVs to the corresponding residual matrices
-    left_join(
-        list_all_SVs(),
-        by=join_by(CPM.cutoff, residual.model, AD.definition.column, sample.strategy)
+    inner_join(
+        list_all_results_files_in_set(set.name='SVs'),
+        by=
+            join_by(
+                CPM.cutoff,
+                residual.model,
+                sample.strategy,
+                AD.definition.column
+            )
     ) %>% 
     # Define all relevant arguments/analysis decisions/parameters to decorate in the results filepath
     # explicity, this also allows for easier parsing of the results, associating each results
@@ -67,12 +71,3 @@ all.input.and.parameter.combinations.df %>%
         sample.metadata=sample.metadata
     ) 
 
-############################################################
-# Load decorate CRD annotations
-############################################################
-decorate.results.df <- 
-    list_all_decorate_peak_clusters() %>% 
-    filter(cluster.scope == 'filtered.clusters')
-# decorate.results.df %>% 
-#     count(CPM.cutoff, residual.model, sample.strategy, meanClusterSize, cluster.scope)
-# decorate.results.df$filepath[[1]] %>% read_tsv() %>% count(chr, CRDID) %>% count(chr)

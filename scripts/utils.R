@@ -157,6 +157,28 @@ parse_results_filelist <- function(
     readr::type_convert()
 }
 
+factorize_phenotypes <- function(df) {
+    df %>% 
+    mutate(
+        age=as.integer(age),
+        CDR_3levels=
+            factor(
+                CDR_3levels,
+                levels=c('Healthy', 'MCI', 'Dementia')
+            ),
+        Braak_3levels=
+            factor(
+                Braak_3levels,
+                levels=c('Braak_Max2', 'Braak_3to4', 'Braak_5plus')
+            ),
+        AD_CERAD_withDLB=
+            factor(
+                AD_CERAD_withDLB,
+                levels=c('Control', 'AD', 'Other')
+            )
+    )
+}
+
 ############################################################
 # Loading ATAC Data
 ############################################################
@@ -204,24 +226,7 @@ load_sample_metadata <- function(...){
                 )
             }
     ) %>% 
-    mutate(
-        age=as.integer(age),
-        CDR_3levels=
-            factor(
-                CDR_3levels,
-                levels=c('Healthy', 'MCI', 'Dementia')
-            ),
-        Braak_3levels=
-            factor(
-                Braak_3levels,
-                levels=c('Braak_Max2', 'Braak_3to4', 'Braak_5plus')
-            ),
-        AD_CERAD_withDLB=
-            factor(
-                AD_CERAD_withDLB,
-                levels=c('Control', 'AD', 'Other')
-            )
-    )
+    factorize_phenotypes()
 }
 
 list_all_ATAC_residual_sets <- function(){
@@ -268,3 +273,127 @@ list_all_ATAC_datasets <- function(){
         by=join_by(CPM.cutoff)
     )
 }
+
+############################################################
+# Listing all results files + metadta prefedined named sets of results 
+############################################################
+list_all_results_files_in_set <- function(
+    set.name,
+    ...){
+    if (set.name == 'SVs') {
+        SVA_RESULTS_DIR %>% 
+        parse_results_filelist(
+            ...,
+            suffix='peak.residual.SVs.tsv'
+        ) %>%
+        dplyr::rename('SVs.filepath'=filepath) %>% 
+        select(-c(filename))
+    } else if (set.name == 'SVs.elbow') {
+        ELBOW_RESULTS_DIR %>% 
+        # CRD_RESULTS_DIR %>% 
+        parse_results_filelist(
+            ...,
+            suffix='elbow.cluster.data.tsv',
+            filename.column.name='filename'
+        ) # %>% select(-c(filename))
+    } else if (set.name == 'SVs.variancePartition') {
+        SV_VARIANCEPARTITION_RESULTS_DIR %>% 
+        parse_results_filelist(
+            ...,
+            suffix='SV.variance.partition.results.tsv',
+            filename.column.name='filename'
+        ) %>% 
+        select(-c(filename))
+    } else if (set.name == 'CRD.blobs') {
+        CRD_RESULTS_DIR %>%
+        parse_results_filelist(
+            ...,
+            suffix='decorate.cluster.blob.rds'
+        ) %>% 
+        select(-c(filename))
+    # } else if (set.name == '') {
+    } else {
+        stop(glue('Invalid results set name: {set.name}'))
+    }
+}
+
+############################################################
+# Load differential abundance results for individual OCRs
+############################################################
+load_differential_OCR_results <- function(...){
+    check_cached_results(
+        ...,
+        results_file=DIFFERENTIAL_OCR_RESULTS_TSV_FILEPATH,
+        results_fnc=
+            function() {
+                DIFFERENTIAL_OCR_RESULTS_RDS_FILEPATH %>%
+                readRDS() %>%
+                    {.} -> tmp; tmp
+                enframe(
+                    name='model.name',
+                    value='model'
+                ) %>%
+                mutate(contrast=pmap(.l=list(model), .f=~ .x$ALL %>% names() %>% list())) %>%
+                unnest(contrast) %>% 
+                mutate(contrast.type=ifelse(str_detect(contrast, '_for_'), 'discrete', 'continuous')) %>% 
+                separate_wider_delim(
+                    contrast,
+                    delim='_for_',
+                    names=c(NA, 'contrast.variable'),
+                    too_few='align_start',
+                    cols_remove=FALSE
+                ) %>% 
+                mutate(
+                    differential.results.df=
+                        pmap(
+                            .l=.,
+                            .f=
+                                function(model, variable.names, ...){
+                                    model$ALL[[variable.names]] %>% 
+                                    as_tibble() %>%
+                                    dplyr::rename(
+                                        'chr'=chromosome_name,
+                                        'EnsemblID'=ensembl_gene_id,
+										"peak.start"=start_position,
+										"peak.end"=end_position,
+                                        "peak.strand"=strand,
+										"peak.annotation"=annotation,
+                                        "peak.annotation.simple"=annotationSimple,
+                                        "gene.chr"=geneChr,
+										"gene.start"=geneStart,
+										"gene.end"=geneEnd,
+                                        "gene.length"=geneLength,
+										"gene.strand"=geneStrand,
+										"gene.name"=Associated.Gene.Name,
+										"p.value"=P.Value,
+                                        "p.adjust"=adj.P.Val
+
+                                    ) %>% 
+                                    mutate(peak.length=peak.end-peak.start)
+                                }
+                        )
+                )
+            }
+    ) %>% 
+    filter(contrast.type == 'discrete') %>% 
+    add_column(sample.strategy='All.Samples') %>% 
+    select(
+        PeakID,
+        EnsemblID, gene.name,
+        chr, 
+        peak.start,
+        peak.end,
+        # peak.strand,
+        peak.annotation,
+        peak.annotation.simple,
+        # gene.chr,
+        gene.start,
+        gene.end,
+        # gene.length,
+        # gene.strand,
+        # AveExpr, z.std, t,
+        logFC,
+        p.value, p.adjust
+    )
+}
+

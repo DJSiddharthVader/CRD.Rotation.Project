@@ -564,14 +564,6 @@ run_decorate_pipeline <- function(
     }
 }
 
-list_all_decorate_peak_clusters <- function(){
-    CRD_RESULTS_DIR %>%
-    parse_results_filelist(
-        suffix='-decorate.Peak.Clusters.tsv',
-        filename.column.name='cluster.scope'
-    )
-}
-
 ############################################################
 # Misc posterity code
 ############################################################
