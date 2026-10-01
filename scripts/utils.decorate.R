@@ -206,16 +206,6 @@ run_sva_on_peak_residuals <- function(
     )
 }
 
-list_all_SVs <- function(){
-    SVA_RESULTS_DIR %>% 
-    parse_results_filelist(
-        suffix='peak.residual.SVs.tsv',
-        filename.column.name='filename'
-    ) %>%
-    dplyr::rename('SVs.filepath'=filepath) %>% 
-    select(-c(filename))
-}
-
 residualize_out_specified_SVs <- function(
     peak.residuals.mx,
     SVs.df,
