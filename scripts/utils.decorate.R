@@ -393,6 +393,55 @@ generate_SV_varpar_results <- function(
 ############################################################
 # Generate decorate clusters
 ############################################################
+tidy_CRD_scores <- function(scores.obj){
+    scores.obj %>% 
+    enframe(
+        name='meanClusterSize',
+        value='scores'
+    ) %>% 
+    unnest(scores) %>%
+    as_tibble() %>%
+    select(-c(id))
+}
+
+tidy_CRD_clusters <- function(clusters.obj) {
+    # every row is assignment for a single peak to a CRD
+    # columns: meanClusterSize, chr, PeakID, ClusterID
+    clusters.obj %>%
+    names() %>% 
+    tibble(meanClusterSize=.) %>% 
+    mutate(
+        peak.clusters=
+            future_pmap(
+                .l=.,
+                .progress=FALSE,
+                .f=
+                    function(meanClusterSize, ...) {
+                        all.genome.clusters <- clusters.obj[[meanClusterSize]]
+                        all.genome.clusters %>% 
+                        names() %>% 
+                        tibble(chr=.) %>% 
+                        mutate(
+                            clusters=
+                                pmap(
+                                    .l=,
+                                    .f=
+                                        function(chr, ...){
+                                            all.genome.clusters[[chr]] %>% 
+                                            enframe(
+                                                name='PeakID',
+                                                value='ClusterID'
+                                            )
+                                        }
+                                )
+                        )
+                    }
+            )
+    ) %>%
+    unnest(peak.clusters) %>% 
+    mutate(ClusterID=glue('{chr}.{ClusterID}'))
+}
+
 generate_LEFs_only_with_decorate <- function(
     peak.residuals.mx,
     peak.locations,
@@ -429,12 +478,7 @@ generate_LEFs_only_with_decorate <- function(
         all.tree.list.clusters,
         BPPARAM=BPPARAM
     ) %>% 
-    sapply(
-        FUN=as_tibble,
-        simplify=FALSE,
-        USE.NAMES=TRUE
-    ) %>% 
-    bind_rows(.id='meanClusterSize')
+    tidy_CRD_scores()
 }
 
 generate_peak_cluster_with_decorate <- function(
@@ -491,14 +535,7 @@ generate_peak_cluster_with_decorate <- function(
         )
     # return all data
     list(
-        cluster.LEFs=
-            tree.scores %>%
-            sapply(
-                FUN=as_tibble,
-                simplify=FALSE,
-                USE.NAMES=TRUE
-            ) %>% 
-            bind_rows(.id='meanClusterSize'),
+        cluster.LEFs=tidy_CRD_scores(tree.scores),
         tree.list=tree.list,
         all.clusters=all.tree.list.clusters,
         filtered.clusters=filtered.tree.list.clusters
