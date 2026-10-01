@@ -185,7 +185,6 @@ factorize_phenotypes <- function(df) {
 load_sample_metadata <- function(...){
     check_cached_results(
         ...,
-        # silence=TRUE,
         results_file=SAMPLE_METADATA_TSV_FILEPATH,
         results_fnc=
             function(){

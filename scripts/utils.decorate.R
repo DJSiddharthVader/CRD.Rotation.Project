@@ -2,6 +2,7 @@
 # Dependencies
 ############################################################
 suppressPackageStartupMessages({
+    library(vegan)
     library(sva)
     library(GenomicRanges)
     library(decorate)
@@ -270,7 +271,9 @@ residualize_SVs <- function(
 generate_elbow_data <- function(
     SVs.filepath,
     all.sample.metadata,
+    BPPARAM=SerialParam(),
     ...){
+    # paste0(c('row.index=1', paste0(colnames(tmp), '=tmp$', colnames(tmp), '[[row.index]]', collapse='; ')), collapse='; ')
     all.SVs <- 
         SVs.filepath %>% 
         read_tsv(show_col_types=FALSE, n_max=1) %>% 
@@ -279,13 +282,13 @@ generate_elbow_data <- function(
     mutate(
         LEFs=
             future_pmap(
-            # pmap(
                 .l=.,
                 .f=run_decorate_pipeline,
+                ...,
                 SVs.filepath=SVs.filepath,
                 sample.metadata=all.sample.metadata,
-                ...,
                 LEFs.only=TRUE,
+                p=progressor(label='SVs included', steps=length(all.SVs)),
                 .progress=TRUE
             )
     ) %>%
@@ -407,7 +410,7 @@ generate_LEFs_only_with_decorate <- function(
     method.corr,
     clusterMethod,
     meanClusterSize,
-    cores,
+    BPPARAM=SerialParam(),
     ...){
     # Evaluate hierarchical clustering
     # adjacentCount is the number of adjacent peaks considered in correlation
@@ -423,8 +426,8 @@ generate_LEFs_only_with_decorate <- function(
     # Choose cutoffs and return clusters using multiple values for meanClusterSize 
     # Clusters corresponding to each parameter value are returned and then processed downstream
     # By using multiple parameter values, epigenetic features are included in clusters 
-    # at different resolutions
     all.tree.list.clusters <- 
+    # at different resolutions
         tree.list %>% 
         createClusters(
             method=clusterMethod,
@@ -434,7 +437,7 @@ generate_LEFs_only_with_decorate <- function(
     tree.list %>% 
     scoreClusters(
         all.tree.list.clusters,
-        BPPARAM=SnowParam(cores)
+        BPPARAM=BPPARAM
     ) %>% 
     sapply(
         FUN=as_tibble,
@@ -454,7 +457,7 @@ generate_peak_cluster_with_decorate <- function(
     jaccardCutoff,
     filterMetric,
     filterMetricCutoff,
-    cores,
+    BPPARAM=SerialParam(),
     ...){
     # Evaluate hierarchical clustering
     # adjacentCount is the number of adjacent peaks considered in correlation
@@ -479,7 +482,10 @@ generate_peak_cluster_with_decorate <- function(
         )
     tree.scores <- 
         tree.list %>% 
-        scoreClusters(all.tree.list.clusters, BPPARAM=SnowParam(cores))
+        scoreClusters(
+            all.tree.list.clusters,
+            BPPARAM=BPPARAM
+        )
     filtered.tree.list.clusters <- 
         tree.scores %>% 
         retainClusters( 
@@ -516,9 +522,9 @@ run_decorate_pipeline <- function(
     sample.metadata,
     AD.definition.column='AD_CERAD_withDLB',
     sample.strategy='All',
-    SVs.included='All',
-    SV.cor.thresh=0.3,
+    SVs.included=Inf,
     LEFs.only=FALSE,
+    p=NULL,
     ...) {
     # subset + order data as defined
     peak.data <- 
@@ -548,20 +554,24 @@ run_decorate_pipeline <- function(
     } else {
         stop(glue('SVs.included must be an integer, passed: {SVs.included}'))
     }
-    # SV.adjusted.peak.residuals.mx %>% as.data.frame() %>% rownames_to_column('PeakID')
+    # generate peak clusters, either just the cluster LEF scores or the full blob with peak-clusters
     if (LEFs.only) {
-        generate_LEFs_only_with_decorate(
-            peak.residuals.mx=SV.adjusted.peak.residuals.mx,
-            peak.locations=peak.data$locations,
-            ...
-        )
+        results.obj <- 
+            generate_LEFs_only_with_decorate(
+                peak.residuals.mx=peak.residuals.mx,
+                peak.locations=peak.data$locations,
+                ...
+            )
     } else {
-        generate_peak_cluster_with_decorate(
-            peak.residuals.mx=SV.adjusted.peak.residuals.mx,
-            peak.locations=peak.data$locations,
-            ...
-        )
+        results.obj <- 
+            generate_peak_cluster_with_decorate(
+                peak.residuals.mx=peak.residuals.mx,
+                peak.locations=peak.data$locations,
+                ...
+            )
     }
+    if (!is.null(p)) { p() }
+    return(results.obj)
 }
 
 ############################################################

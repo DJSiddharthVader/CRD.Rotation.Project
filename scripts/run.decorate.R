@@ -26,13 +26,9 @@ all.input.and.parameter.combinations.df <-
                 AD.definition.column
             )
     ) %>% 
-    # Define all relevant arguments/analysis decisions/parameters to decorate in the results filepath
-    # explicity, this also allows for easier parsing of the results, associating each results
-    # file with this metadata automatically in R
-    cross_join(DECORATE_HYPER_PARAMS_DF) %>%
-    # cross_join(tibble(SVs.included=c('All', 'None', 'uncorrelated')))
-    # cross_join(tibble(SVs.included=c('All', 'None', 'uncorrelated', 5)))
-    cross_join(tibble(SVs.included=c('All', 'None')))
+    filter(z.score.counts, n.SVs == NUM_SVS_TO_GENERATE) %>% 
+    cross_join(tibble(SVs.included=c(0,5))) %>%
+    cross_join(DECORATE_HYPER_PARAMS_DF)
 
 ############################################################
 # Run decorate for each parameter combination
@@ -40,10 +36,10 @@ all.input.and.parameter.combinations.df <-
 # For every residual matrix + sample strategy + hyper-param option 
 # use decorate to annotate a set of CRDs
 # all.input.and.parameter.combinations.df
+N_PROCESSES <- TOTAL_CORES * (3 / 5)
+N_CORES_PER_PROCESS <- floor((TOTAL_CORES - N_PROCESSES) / N_PROCESSES)
+plan(multisession, workers=N_PROCESSES)
 all.input.and.parameter.combinations.df %>% 
-    # Define all relevant arguments/analysis decisions/parameters to decorate in the results filepath
-    # explicity, this also allows for easier parsing of the results, associating each results
-    # file with this metadata automatically in R
     mutate(
         results_dir=
             file.path(
@@ -59,15 +55,21 @@ all.input.and.parameter.combinations.df %>%
                 glue('filterMetric_{filterMetric}'),
                 glue('filterMetricCutoff_{filterMetricCutoff}'),
                 glue('jaccardCutoff_{jaccardCutoff}')
-            )
+            ),
+        results_file=file.path(results_dir, 'decorate.blob.rds')
     ) %>% 
         {.} -> tmp; tmp
         # tmp %>% 
-    pmap(
+    future_pmap(
         .l=.,
-        .f=generate_decorate_peak_clusters,
-        # .f=check_cached_results,
-        # results_fnc=generate_decorate_peak_clusters,
-        sample.metadata=sample.metadata
+        .f=check_cached_results,
+        # force_redo=TRUE,
+        # return_data=FALSE,
+        # silence=TRUE,
+        results_fnc=run_decorate_pipeline,
+        sample.metadata=all.sample.metadata,
+        BPPARAM=SnowParam(N_CORES_PER_PROCESS),
+        p=progressor(label='decorate runs', steps=nrow(all.input.and.parameter.combinations.df)),
+        .progress=TRUE
     ) 
 

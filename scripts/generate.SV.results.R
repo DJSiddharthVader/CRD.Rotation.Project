@@ -4,7 +4,7 @@
 library(here)
 source(here('scripts', 'basic.imports.R'))
 source(here('scripts', 'utils.decorate.R'))
-# handlers(global=TRUE) # for progress bars
+handlers("progress")
 # load patient metadata
 all.sample.metadata <- 
     load_sample_metadata()
@@ -16,13 +16,14 @@ peak.matrices.df <-
     cross_join(RESIDUAL_MATRIX_SAMPLE_PARAMS_DF) %>%
     cross_join(
         expand_grid(
-            n.SVs=c('leek', 1:NUM_SVS_TO_GENERATE),
+            # n.SVs=c('leek', 1:NUM_SVS_TO_GENERATE),
+            n.SVs=1:NUM_SVS_TO_GENERATE,
             z.score.counts=c(TRUE, FALSE)
         )
     )
 
 ############################################################
-# Estimate Surrogate Variables (SVs) for different count matrices
+# Estimate Surrogate Variables (SVs) for different input matrices
 ############################################################
 plan(multisession, workers=TOTAL_CORES)
 peak.matrices.df %>% 
@@ -51,16 +52,14 @@ peak.matrices.df %>%
     ) 
 
 ############################################################
-# Compute LEFs from residuals with varying numbers of SVs regressed out
+# Generate all combinations of input matrices + decorate hyper-params
 ############################################################
-# take all input residual matrices
-# map all SV sets to residual matrices they can be applied to + decorate hyper-params
 peak.and.SV.combos.df <- 
+    # all possible input matrices to run decorate on 
     peak.matrices.df %>% 
-    # match them to all sets of SVs produced
+    # match each matrix them to all sets of SVs produced that we want to regress out
     inner_join(
         list_all_results_files_in_set(set.name='SVs'),
-        list_all_SVs(),
         by=
             join_by(
                 CPM.cutoff,
@@ -73,8 +72,8 @@ peak.and.SV.combos.df <-
     ) %>%
     # SVs are correlated no matter how many you estimate i.e. A=SVs[1..N] and B=SVs[1..M]
     # estimated from two different calls to run_sva() on the same input matrix
-    # so if I=min(N,M) then cor(A[1..I], B[1..I] ~= 1 so 
-    # we can just use the single largest set of SV estimates and vary how many SVs we residualize out ({1..N},{1..M})
+    # so if I=min(N,M) then cor(A[1..I], B[1..I] ~= 1 so # we can just use 
+    # the single largest set of SV estimates and vary how many SVs we residualize out ({1..N},{1..M})
     # to titrate the effects of SVs (instead of also measuring across SV sets ({A,B})
     filter(n.SVs == NUM_SVS_TO_GENERATE)
     filter(n.SVs == NUM_SVS_TO_GENERATE) %>% 
@@ -123,9 +122,15 @@ peak.and.SV.combos.df %>%
 ############################################################
 # Compute variancePartition() of metadata and SVs  pre/post SV residualizing
 ############################################################
-plan(multisession, workers=TOTAL_CORES)
-peak.matrices.df %>% 
-    # define output filepath for R blob with decorate results
+# variancePartition analysis showing the variance contributions from each 
+# metadata variable and how it changes before/after residualizing out a set of SVs
+# We can also see what the variance contributions are for the SVs themselves
+# Repeat across SV titrations (i.e. increasing number of included SVs separately)
+N_PROCESSES <- TOTAL_CORES * (2 / 5)
+N_CORES_PER_PROCESS <- floor((TOTAL_CORES - N_PROCESSES) / N_PROCESSES)
+plan(multisession, workers=N_PROCESSES)
+peak.and.SV.combos.df %>% 
+    # define output filepath for variancePartition results table
     mutate(
         results_dir=
             file.path(
