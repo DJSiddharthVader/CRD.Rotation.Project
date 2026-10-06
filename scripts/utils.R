@@ -117,28 +117,18 @@ parse_results_filelist <- function(
     # Extract param info from directory names into structured columns
     {
         if (parse_filepath_to_columns) {
+            mutate(., !!filename.column.name := basename(str_remove(fileinfo, suffix))) %>% 
+            mutate(fileinfo=dirname(fileinfo)) %>% 
             separate_longer_delim(
                 .,
                 fileinfo,
                 delim='/'
             ) %>%
-            mutate(
-                fileinfo=
-                    ifelse(
-                        grepl(suffix_pattern, fileinfo),
-                        paste(
-                            filename.column.name,
-                            fileinfo,
-                            sep=param_delim
-                        ) %>% 
-                        str_remove(suffix),
-                        fileinfo
-                    )
-            ) %>% 
             separate_wider_delim(
                 fileinfo,
-                delim='_',
+                delim=param_delim,
                 too_many="merge",  # in case filenames have delim inside
+                too_few="align_start",
                 names=
                     c(
                         'Parameter',
