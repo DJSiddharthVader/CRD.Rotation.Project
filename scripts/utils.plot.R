@@ -5,9 +5,10 @@ suppressPackageStartupMessages({
     library(ggplot2)
     library(ggpubr)
     library(ggh4x)
-    # library(ggridges)
+    library(ggridges)
     library(GGally)
     library(scales)
+    library(ggragged)
     # library(ggpointdensity)
     # library(viridis)
     library(ComplexUpset)
@@ -104,6 +105,7 @@ build_axis_fnc <- function(
             scale.mode == 'log10'    ~ 'log10',
             is.character(scale.data) ~ 'discrete',
             is.factor(scale.data)    ~ 'discrete',
+            scale.mode == 'discrete' ~ 'discrete',
             # scale.mode == 'binned'   ~ 'binned',
             scale.mode == ''         ~ 'continuous'
         )
@@ -213,11 +215,41 @@ scale_axis <- function(
     }
 }
 
+make_facet_formula <- function(
+    figure,
+    facet.group=NULL,
+    facet.col=NULL,
+    facet.row=NULL,
+    facet.nrow=NULL,
+    facet.ncol=NULL,
+    ...){
+    if (!is.null(facet.col) & !is.null(facet.row)) {
+        paste(
+            paste(facet.row, collapse=' + '),
+            paste(facet.col, collapse=' + '),
+            sep=' ~ '
+        ) %>%
+        formula()
+    } else if (!is.null(facet.row)) {
+        formula(glue('{paste(facet.row, collapse=" + ")} ~ .'))
+    } else if (!is.null(facet.col)) {
+        formula(glue('~ {paste(facet.col, collapse=" + ")}'))
+    } else if (!is.null(facet.group)) {
+        formula(glue('~ {paste(facet.group, collapse=" + ")}'))
+    } else {
+        stop(glue('Invalid faceting variable selection'))
+    }
+}
+
 add_faceting <- function(
     figure,
     scales='fixed',
     space='fixed',
     independent=FALSE,
+    ragged='none',
+    drop=TRUE,
+    axes='margins',
+    # margins='none',
     # solo_line=TRUE,
     # axes=FALSE,
     # trim_blank=TRUE,
@@ -227,60 +259,64 @@ add_faceting <- function(
     facet.nrow=NULL,
     facet.ncol=NULL,
     ...){
+    faceting.formula <- 
+        make_facet_formula(
+            facet.group=facet.group,
+            facet.col=facet.col,
+            facet.row=facet.row,
+            facet.nrow=facet.nrow,
+            facet.ncol=facet.ncol
+        )
     # Facet as specified
-    if (!is.null(facet.col) & !is.null(facet.row)) {
-        figure <- 
-            figure +
-            facet_nested(
-                paste(
-                    paste(facet.row, collapse=' + '),
-                    paste(facet.col, collapse=' + '),
-                    sep=' ~ '
-                ) %>%
-                formula(),
-                scales=scales, 
-                space=space,
-                independent=independent,
-                # solo_line=solo_line,
-                # axes=axes,
-                # trim_blank=trim_blank,
-                ...
-            )
-    } else if (!is.null(facet.row)) {
-        figure <- 
-            figure +
-            facet_nested(
-                formula(glue('{paste(facet.row, collapse=" + ")} ~ .')),
-                scales=scales, 
-                space=space,
-                independent=independent,
-                # solo_line=solo_line,
-                # axes=axes,
-                # trim_blank=trim_blank,
-                ...
-            )
-    } else if (!is.null(facet.col)) {
-        figure <- 
-            figure +
-            facet_nested(
-                formula(glue('~ {paste(facet.col, collapse=" + ")}')),
-                scales=scales, 
-                space=space,
-                independent=independent,
-                # solo_line=solo_line,
-                # trim_blank=trim_blank,
-                # axes=axes,
-                ...
-            )
-    } else if (!is.null(facet.group)) {
+    if (!is.null(facet.group)) {
         figure <- 
             figure +
             facet_wrap2(
                 vars(!!sym(facet.group)),
                 nrow=facet.nrow,
-                ncol=facet.ncol
+                ncol=facet.ncol,
+                scales=scales, 
+                # space=space,
+                axes=independent,
+                drop=drop,
                 # ...
             )
+    } else {
+        if (ragged == 'r') {
+            figure <- 
+                figure +
+                facet_ragged_rows(
+                    cols=vars(!!sym(facet.col)),
+                    rows=vars(!!sym(facet.row)),
+                    scales=scales,
+                    axes=axes,
+                    ...
+                )
+        } else if  (ragged == 'c') {
+            figure <- 
+                figure +
+                facet_ragged_cols(
+                    cols=vars(!!sym(facet.col)),
+                    rows=vars(!!sym(facet.row)),
+                    scales=scales,
+                    axes=axes,
+                    ...
+                )
+        } else {
+            figure <- 
+                figure +
+                facet_nested(
+                    faceting.formula,
+                    scales=scales, 
+                    space=space,
+                    independent=independent,
+                    drop=drop,
+                    # solo_line=solo_line,
+                    # axes=axes,
+                    # trim_blank=trim_blank,
+                    ...
+                )
+        }
     }
     figure
 }
@@ -291,9 +327,10 @@ post_process_plot <- function(
     theme.obj=NULL,
     scales='fixed',
     space='fixed',
+    facet.ragged='none',
     independent=FALSE,
     drop=TRUE,
-    axes='margins',
+    # axes='margins',
     margins=FALSE,
     facet.row=NULL,
     facet.nrow=NULL,
@@ -308,7 +345,7 @@ post_process_plot <- function(
     x.expand=c(0.00, 0.00, 0.00, 0.00),
     y.scale.mode='',
     y.log.base=10,
-    y.axis.label.accuracy=0.1,
+    y.axis.label.accuracy=0.01,
     y.n.breaks=NULL,
     y.limits=NULL,
     y.expand=c(0.00, 0.00, 0.00, 0.00),
@@ -336,9 +373,10 @@ post_process_plot <- function(
         scales=scales,
         space=space,
         independent=independent,
-        axes=axes,
+        ragged=facet.ragged,
+        # axes=axes,
         drop=drop,
-        margins=margins,
+        # margins=margins,
         facet.row=facet.row,
         facet.col=facet.col,
         facet.group=facet.group,

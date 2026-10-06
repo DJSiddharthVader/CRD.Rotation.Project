@@ -1334,6 +1334,18 @@ dependencies = [
 ]
 
 [[packages]]
+name = "ggragged"
+version = "0.2.0"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    "ggplot2",
+    "gtable",
+    "rlang",
+    "vctrs",
+]
+
+[[packages]]
 name = "ggrepel"
 version = "0.9.8"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }
@@ -1345,6 +1357,17 @@ dependencies = [
     "S7",
     { name = "scales", requirement = "(>= 1.4.0)" },
     { name = "withr", requirement = "(>= 3.0.2)" },
+]
+
+[[packages]]
+name = "ggridges"
+version = "0.5.7"
+source = { repository = "https://packagemanager.posit.co/cran/latest" }
+force_source = false
+dependencies = [
+    { name = "ggplot2", requirement = "(>= 3.5.0)" },
+    { name = "scales", requirement = "(>= 0.4.1)" },
+    { name = "withr", requirement = "(>= 2.1.1)" },
 ]
 
 [[packages]]
