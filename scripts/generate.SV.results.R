@@ -120,21 +120,29 @@ peak.and.SV.combos.df %>%
     )
 
 ############################################################
-# Compute variancePartition() of metadata and SVs  pre/post SV residualizing
+# Compute summary stats on peak abundances on iteratively regresessed out SVs
 ############################################################
-# variancePartition analysis showing the variance contributions from each 
-# metadata variable and how it changes before/after residualizing out a set of SVs
-# We can also see what the variance contributions are for the SVs themselves
-# Repeat across SV titrations (i.e. increasing number of included SVs separately)
-N_PROCESSES <- TOTAL_CORES * (2 / 5)
-N_CORES_PER_PROCESS <- floor((TOTAL_CORES - N_PROCESSES) / N_PROCESSES)
-plan(multisession, workers=N_PROCESSES)
-peak.and.SV.combos.df %>% 
+plan(multisession, workers=TOTAL_CORES)
+peak.matrices.df %>% 
+    # match each matrix them to all sets of SVs produced that we want to regress out
+    inner_join(
+        list_all_results_files_in_set(set.name='SVs'),
+        by=
+            join_by(
+                CPM.cutoff,
+                residual.model,
+                sample.strategy,
+                AD.definition.column,
+                n.SVs,
+                z.score.counts
+            )
+    ) %>%
+    filter(n.SVs == NUM_SVS_TO_GENERATE) %>% 
     # define output filepath for variancePartition results table
     mutate(
         results_dir=
             file.path(
-                SV_VARIANCEPARTITION_RESULTS_DIR,
+                SV_PEAK_STATS_DIR,
                 glue('CPM.cutoff_{CPM.cutoff}'),
                 glue('residual.model_{residual.model}'),
                 glue('AD.definition.column_{AD.definition.column}'),
@@ -142,7 +150,7 @@ peak.and.SV.combos.df %>%
                 glue('z.score.counts_{z.score.counts}'),
                 glue('n.SVs_{n.SVs}')
             ),
-        results_file=file.path(results_dir, 'SV.variance.partition.results.tsv')
+        results_file=file.path(results_dir, 'peak.stats.with.SVs.removed.tsv')
     ) %>% 
     # for each SV i, include up to SVs 0:i and regress out -> varPar on SV-regressed out matrix
     pmap(
@@ -150,11 +158,8 @@ peak.and.SV.combos.df %>%
         .f=check_cached_results,
         # force_redo=TRUE,
         return_data=FALSE,
-        results_fnc=generate_SV_varpar_results,
+        results_fnc=compute_SV_regressed_peak_stats,
         all.sample.metadata=all.sample.metadata,
-        model.variables=RELEVANT_METADATA_COLUMNS,
-        BPPARAM=SnowParam(N_CORES_PER_PROCESS),
         .progress=TRUE
-
     ) 
 

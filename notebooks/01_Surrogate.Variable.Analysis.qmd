@@ -382,9 +382,109 @@ SV.metadata.correlations.df %>%
 
 # variancePartition Analysis
 
-What is the variance explained by the model variables pre-post residualizing out SVs?
-How much varaince to the SVs account for in terms of chromatin accessability?
+## How much does iteratively regressing how SVs affect total peak vairance? {#sec-varianceElbow}
 
+First we want to show the difference in total variance of the input matrix $R$ before and after iteratively regressing out up to $N$ SVs. 
+For each SV regressed matrix $$R_i = residuals(R, SV_{1 \dots i}) \quad | \quad \forall i \in \{1\dots N\}$$ we calculate the variance of each peak across all samples, then we compute summary statiscs across all peak variances. 
+Here I am plotting the mean and total peak variance across all SV-residualzied matrices $R_{1 \dots N} = \{R_1, \dots, R_N\}$, as we can see there is an elbow like decrease in peak variance as we regress out more SVs.
+
+```{r load_peak_variances}
+#| echo: false
+# #| eval: false
+
+summarize_peak_variances <- function(
+    peak.stats.filepath,
+    ...){
+    peak.stats.filepath %>%
+    read_tsv(show_col_types=FALSE) %>%
+    group_by(across(-c(PeakID, peak.variances))) %>% 
+    summarize(
+        .groups='drop',
+        across(
+            .cols=c(peak.variances),
+            .names='stat.{.fn}',
+            .fns=STAT_SUMMARY_FNCS_LIST
+        )
+    ) %>%
+    pivot_longer(
+        starts_with('stat.'),
+        names_to='stat',
+        names_prefix='stat.',
+        values_to='value'
+    )
+}
+all.peak.variance.results.df <- 
+    check_cached_results(
+        results_file=file.path(NOTEBOOK_CACHE_DIR, 'peak.variance.data.tsv'),
+        force_redo=FORCE_REDO,
+        # force_redo=TRUE,
+        results_fnc=
+            function() {
+                list_all_results_files_in_set(set.name='peak.variance.stats') %>%
+                mutate(
+                    elbow=
+                        future_pmap(
+                            .l=.,
+                            .f=summarize_peak_variances,
+                            .progress=TRUE
+                        )
+                ) %>% 
+                unnest(elbow)
+            }
+    ) %>% 
+    filter(
+        z.score.counts,
+        n.SVs == NUM_SVS_TO_GENERATE
+    ) %>% 
+    dplyr::rename('SVs.Regressed.Out'=SVs.included) %>% 
+    select(
+        CPM.cutoff, residual.model, AD.definition.column, sample.strategy,
+        z.score.counts, n.SVs, SVs.Regressed.Out,
+        stat, value
+    )
+```
+
+```{r plot_peak_variances_elbow, results='asis'}
+#| echo: false
+#| fig-height: 4
+#| fig-width: 10
+# #| eval: false
+
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model'
+        # 'sample.strategy'
+    )
+all.peak.variance.results.df %>% 
+    filter(stat %in% c('mean', 'total')) %>% 
+    mutate(stat=glue('{stat} variance across peaks')) %>% 
+    order_variable_for_plotting() %>% 
+    nest(plot.df=-all_of(nesting.vars)) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                # .f=plot_ribbonplot, ymin.var='ymin', ymax.var='ymax',
+                .f=plot_lineplot, 
+                x.var='SVs.Regressed.Out',
+                y.var='value',
+                size=1, linewidth=0.75,
+                group.var='sample.strategy', color.var='sample.strategy', facet.col='stat',
+                scales='free_y', space='fixed', independent='y',
+                axis.title.y=element_blank(),
+                # plot.elements=list(geom_hline(yintercept=0.3, linewidth=0.15, linetype='dashed')),
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=3,
+        tabset_vars=nesting.vars,
+        output_var='figures'
+    )
+```
+
+## How much peak variance do SVs capture?
 # CRD Elbow Plot of LEFs vs SVs
 
 First load all the data where we calcualted all decorate CRD LEFs from separate matrices with different sets of SVs regressed out i.e. {1}, {1,2}, {1,2,3,...N} etc. 
