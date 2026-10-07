@@ -92,3 +92,20 @@ DECORATE_HYPER_PARAMS_DF <-
         filterMetricCutoff=c(0.15),
         jaccardCutoff=c(0.9)
     )
+
+############################################################
+# Common functions/summary stats
+############################################################
+STAT_SUMMARY_FNCS_LIST <- 
+    c(
+        'min'=min, 
+        'q05'=~ quantile(.x, probs=0.05),
+        'q25'=~ quantile(.x, probs=0.25),
+        'mean'=mean, 'med'=median, 
+        'q75'=~ quantile(.x, probs=0.75),
+        'q95'=~ quantile(.x, probs=0.95),
+        'max'=max,
+        'var'=var, 'sd'=sd,
+        'total'=~ sum(abs(.x))
+    )
+
