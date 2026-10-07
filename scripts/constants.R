@@ -22,6 +22,43 @@ RELEVANT_METADATA_COLUMNS <-
         'sex',
         'RACE'
     )
+# how to order these variable as factor for plotting (left to right in plots)
+# NULL means convert to integer
+ALL_VARIABLE_ORDERINGS <- 
+    list(
+        age=NULL,
+        CDR_3levels=
+            c(
+                'Healthy',
+                'MCI',
+                'Dementia'
+            ),
+        Braak_3levels=
+            c(
+                'Braak_Max2',
+                'Braak_3to4',
+                'Braak_5plus'
+            ),
+        AD_CERAD_withDLB=
+            c(
+                'AD',
+                'Control',
+                'Other'
+            ),
+        residual.model=
+            c(
+                'KeepDxAge',
+                'KeepDx',
+                'Full'
+            ),
+        sample.strategy=
+            c(
+                'All.Samples',
+                'AD.Samples',
+                'Control.Samples',
+                'No.Others'
+            )
+    )
 
 ############################################################
 # Hyper-param combinations

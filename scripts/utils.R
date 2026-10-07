@@ -147,26 +147,46 @@ parse_results_filelist <- function(
     readr::type_convert()
 }
 
-factorize_phenotypes <- function(df) {
-    df %>% 
-    mutate(
-        age=as.integer(age),
-        CDR_3levels=
-            factor(
-                CDR_3levels,
-                levels=c('Healthy', 'MCI', 'Dementia')
-            ),
-        Braak_3levels=
-            factor(
-                Braak_3levels,
-                levels=c('Braak_Max2', 'Braak_3to4', 'Braak_5plus')
-            ),
-        AD_CERAD_withDLB=
-            factor(
-                AD_CERAD_withDLB,
-                levels=c('Control', 'AD', 'Other')
-            )
-    )
+set_col_levels <- function(df, col.name) {
+    if (col.name  %in% colnames(df)) {
+        col.levels <- ALL_VARIABLE_ORDERINGS[[col.name]]
+        if (!is.null(col.levels)) {
+            df %>% mutate(!!col.name := factor(!!sym(col.name), levels=col.levels))
+        } else {
+            df %>% mutate(!!col.name := as.integer(!!sym(col.name)))
+        }
+    } else {
+        df
+    }
+}
+
+order_variable_for_plotting <- function(
+    df,
+    to.skip=NULL,
+    to.keep=NULL,
+    ...) {
+    columns.to.transform <- 
+        colnames(df) %>%
+        intersect(names(ALL_VARIABLE_ORDERINGS)) %>% 
+        {
+            if (!is.null(to.skip)) {
+                setdiff(., to.skip)
+            } else {
+                .
+            }
+        } %>% 
+        {
+            if (!is.null(to.keep)) {
+                intersect(., to.skip)
+            } else {
+                .
+            }
+        }
+    # print(columns.to.transform)
+    for (col.name in columns.to.transform) {
+        df <- df %>% set_col_levels(col.name=col.name)
+    } 
+    return(df)
 }
 
 ############################################################
@@ -214,8 +234,7 @@ load_sample_metadata <- function(...){
                     Final.Dx
                 )
             }
-    ) %>% 
-    factorize_phenotypes()
+    )
 }
 
 list_all_ATAC_residual_sets <- function(){
