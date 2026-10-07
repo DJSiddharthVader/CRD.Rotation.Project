@@ -2,12 +2,10 @@
 # Dependencies
 ############################################################
 suppressPackageStartupMessages({
-    library(vegan)
-    library(sva)
     library(GenomicRanges)
     library(decorate)
     library(limma)
-    library(variancePartition)
+    source(here('scripts', 'utils.SVs.R'))
 })
 
 ############################################################
