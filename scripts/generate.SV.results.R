@@ -52,11 +52,16 @@ peak.matrices.df %>%
     ) 
 
 ############################################################
-# Generate all combinations of input matrices + decorate hyper-params
+# Compute variancePartition() of metadata and SVs  pre/post SV residualizing
 ############################################################
-peak.and.SV.combos.df <- 
-    # all possible input matrices to run decorate on 
-    peak.matrices.df %>% 
+# variancePartition analysis showing the variance contributions from each 
+# metadata variable and how it changes before/after residualizing out a set of SVs
+# We can also see what the variance contributions are for the SVs themselves
+# Repeat across SV titrations (i.e. increasing number of included SVs separately)
+N_PROCESSES <- TOTAL_CORES * (3 / 5)
+N_CORES_PER_PROCESS <- floor((TOTAL_CORES - N_PROCESSES) / N_PROCESSES)
+plan(multisession, workers=N_PROCESSES)
+peak.matrices.df %>% 
     # match each matrix them to all sets of SVs produced that we want to regress out
     inner_join(
         list_all_results_files_in_set(set.name='SVs'),
@@ -75,49 +80,34 @@ peak.and.SV.combos.df <-
     # so if I=min(N,M) then cor(A[1..I], B[1..I] ~= 1 so # we can just use 
     # the single largest set of SV estimates and vary how many SVs we residualize out ({1..N},{1..M})
     # to titrate the effects of SVs (instead of also measuring across SV sets ({A,B})
-    filter(n.SVs == NUM_SVS_TO_GENERATE)
     filter(n.SVs == NUM_SVS_TO_GENERATE) %>% 
-    # match against all combinations of hyper-params for decorate
-    cross_join(DECORATE_HYPER_PARAMS_DF)
-# Now iteratively residualize out SVs in integer order for each residual matrix + SVs then
-# run decorate and save CRD LEFs to a file across various meanClusterSizes
-plan(multisession, workers=TOTAL_CORES)
-peak.and.SV.combos.df %>% 
-    # define output filepath for cluster LEFs
+    # define output filepath for variancePartition results table
     mutate(
         results_dir=
             file.path(
-                ELBOW_RESULTS_DIR,
+                SV_VARIANCEPARTITION_RESULTS_DIR,
                 glue('CPM.cutoff_{CPM.cutoff}'),
                 glue('residual.model_{residual.model}'),
                 glue('AD.definition.column_{AD.definition.column}'),
                 glue('sample.strategy_{sample.strategy}'),
-                glue('n.SVs_{n.SVs}'),
                 glue('z.score.counts_{z.score.counts}'),
-                glue('adjacentCount_{adjacentCount}'),
-                glue('method.corr_{method.corr}'),
-                glue('clusterMethod_{clusterMethod}'),
-                glue('filterMetric_{filterMetric}'),
-                glue('filterMetricCutoff_{filterMetricCutoff}'),
-                glue('jaccardCutoff_{jaccardCutoff}')
+                glue('n.SVs_{n.SVs}')
             ),
-        # results_file=file.path(results_dir, 'elbow.cluster.data.tsv')
-        results_file=file.path(results_dir, 'elbow.cluster.data.tsv')
+        results_file=file.path(results_dir, 'SV.variance.partition.results.tsv')
     ) %>% 
-    # for each SV i, include up to SVs 1:i and regress out -> call decorate clusters -> save LEFs
-    # pmap(
-    future_pmap(
+    # for each SV i, include up to SVs 0:i and regress out -> varPar on SV-regressed out matrix
+    pmap(
         .l=.,
         .f=check_cached_results,
-        return_data=FALSE,
         # force_redo=TRUE,
-        silence=TRUE,
-        results_fnc=generate_elbow_data,
+        return_data=FALSE,
+        results_fnc=generate_SV_varpar_results,
         all.sample.metadata=all.sample.metadata,
-        cores=1,
+        model.variables=RELEVANT_METADATA_COLUMNS,
+        BPPARAM=SnowParam(N_CORES_PER_PROCESS),
         .progress=TRUE
 
-    )
+    ) 
 
 ############################################################
 # Compute summary stats on peak abundances on iteratively regresessed out SVs

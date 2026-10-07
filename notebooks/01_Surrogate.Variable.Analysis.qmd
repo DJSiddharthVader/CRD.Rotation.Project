@@ -487,6 +487,217 @@ all.peak.variance.results.df %>%
 ## How much peak variance do SVs capture?
 # CRD Elbow Plot of LEFs vs SVs
 
+Now we can inspect the distribution of variance explained by each model variable across all peaks when we DO NOT regress out any SVs from the input matrices. 
+So this figure shows the distribution across all peaks of how much variance is specifically captured by each phenotype, covariate and SV. 
+We can see a clear elbow pattern among the SVs, bending around ~5 SVs as with the previous section's resutls.
+
+```{r load_variancePartition_noSVs}
+#| echo: false
+##| eval: false
+
+varpar.results.df <- 
+    check_cached_results(
+        results_file=file.path(NOTEBOOK_CACHE_DIR, 'variancePartition.data.tsv'),
+        force_redo=FORCE_REDO,
+        # force_redo=TRUE,
+        results_fnc=
+            function() {
+                list_all_results_files_in_set(set.name='SVs.variancePartition') %>%
+                filter(z.score.counts, n.SVs == NUM_SVS_TO_GENERATE) %>% 
+                mutate(
+                    varpar0=
+                        future_pmap(
+                            .l=.,
+                            .f=
+                                function(SV.variancePartition.filepath, ...){
+                                    SV.variancePartition.filepath %>%
+                                    read_tsv(show_col_types=FALSE) %>% 
+                                    select(-c(model.variables)) %>% 
+                                    filter(SVs.included == 0) %>% 
+                                    pivot_longer(
+                                        -c(PeakID, total.SVs, SVs.included),
+                                        names_to='model.variable',
+                                        values_to='variance.explained'
+                                    )
+                                },
+                            .progress=TRUE
+                        )
+                ) %>% 
+                unnest(varpar0)
+            }
+    ) %>% 
+    factorize_columns_for_plotting() %>% 
+    dplyr::rename('SVs.Regressed.Out'=SVs.included) %>% 
+    select(
+        CPM.cutoff, residual.model, AD.definition.column, sample.strategy,
+        z.score.counts, n.SVs, SVs.Regressed.Out,
+        variable.type, model.variable, PeakID, variance.explained
+    )
+```
+
+```{r plot_varaincePartition_boxplots, results='asis'}
+#| fig-width: 10 
+#| fig-height: 6
+# #| eval: false
+
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model',
+        'sample.strategy'
+    )
+varpar.results.df %>% 
+    order_variable_for_plotting() %>% 
+    nest(plot.df=-all_of(nesting.vars)) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_boxplot,
+                x.var='model.variable',
+                y.var='variance.explained', 
+                fill.var='variable.type',
+                facet.col='variable.type',
+                scales='free',
+                space='free',
+                independent='all',
+                axis.text.x=element_text(angle=45, hjust=1),
+                .progress=TRUE
+            )
+    ) %>% 
+        # {.} -> tmp
+    custom_render_tabset(
+        starting.hlevel=3,
+        tabset_vars=nesting.vars,
+        output_var='figures'
+    )
+```
+
+## How much does iteratively regressing out SVs affect the variance explained by each variable?
+
+We can look at the individual contributions of each model variable and SV to each individual peak using the `variancePartition` package on all SV-residualized matrices $R_{1 \dots N}$.
+Now we can make a elbow-ish plot for each variable showing how much the variance explained changes as we iteratively regress out more SVs.
+Specifically, the x-axis represents each input matrix $R_{1 \dots N}$ and the y-axis is the mean variance explained by a given variable across all peaks for that input matrix. 
+As expcted, the share of variance explained by each $SV_i$ plummets after we regress it out i.e. remove the associated variation from the input to create $R_i$.
+"Residual" is the proportion of variance observed in the peak abundances NOT attributable to any phenotype, covariate or SV variable.
+Even though the "Residual" increases as we remove more SVs, the total variance is still decreasing along the elbow as we saw in the previous section @sec-varianceElbow . 
+
+```{r load_variancePartition_SV_results}
+# #| eval: false
+
+summarize_variancePartition_results <- function(
+    SV.variancePartition.filepath,
+    ...){
+    # for each set of variance partition results, 
+    # compute summary statistics over variancePartitions of each Peak
+    # compute summary stats per model variable
+    SV.variancePartition.filepath %>%
+    read_tsv(show_col_types=FALSE) %>% 
+    select(-c(model.variables)) %>% 
+    pivot_longer(
+        -c(PeakID, total.SVs, SVs.included),
+        names_to='model.variable',
+        values_to='variance.explained'
+    ) %>%
+    filter(!is.na(variance.explained)) %>% 
+    group_by(SVs.included, model.variable) %>% 
+    summarize(
+        .groups='drop',
+        nPeaks=n(),
+        across(
+            .cols=c(variance.explained),
+            .names='stat.{.fn}',
+            .fns=STAT_SUMMARY_FNCS_LIST
+        )
+    ) %>% 
+    pivot_longer(
+        starts_with('stat.'),
+        names_prefix='stat.',
+        names_to='stat',
+        values_to='value'
+    )
+}
+all.varpar.results.df <- 
+    check_cached_results(
+        results_file=file.path(NOTEBOOK_CACHE_DIR, 'all.SV.variancePartition.data.tsv'),
+        force_redo=FORCE_REDO,
+        # force_redo=TRUE,
+        results_fnc=
+            function() {
+                list_all_results_files_in_set(set.name='SVs.variancePartition') %>%
+                    # {.$filepath[[1]]} -> filepath; filepath
+                mutate(
+                    varparall=
+                        future_pmap(
+                            .l=.,
+                            # .f=read_tsv, show_col_types=FALSE,
+                            .f=summarize_variancePartition_results,
+                            .progress=TRUE
+                        )
+                ) %>% 
+                unnest(varparall)
+            }
+    ) %>% 
+    filter(
+        z.score.counts == TRUE,
+        stat %in% c('q25', 'mean', 'q75', 'sd')
+    ) %>% 
+    factorize_columns_for_plotting(SV.groups=3) %>% 
+    dplyr::rename('SVs.Regressed.Out'=SVs.included) %>% 
+    select(
+        CPM.cutoff, residual.model, AD.definition.column, sample.strategy,
+        z.score.counts, n.SVs, SVs.Regressed.Out,
+        model.variable, variable.type, nPeaks, stat, value
+    )
+```
+
+```{r plot_variancePartition_SV_results, results='asis'}
+#| echo: false
+#| fig-width: 10
+#| fig-height: 10
+# #| eval: false
+
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model'
+        # 'sample.strategy'
+    )
+all.varpar.results.df %>% 
+    # filter(model.variable != 'Residuals') %>% 
+    pivot_wider(names_from=stat, values_from=value) %>% 
+    mutate(ymin=mean - sd, ymax=mean + sd) %>% 
+    order_variable_for_plotting() %>% 
+    nest(plot.df=-all_of(nesting.vars)) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                # .f=plot_ribbonplot, ymin.var='ymin', ymax.var='ymax',
+                .f=plot_lineplot, group.var='sample.strategy',
+                x.var='SVs.Regressed.Out',
+                y.var='mean',
+                size=1, linewidth=0.75,
+                # color.var='variable.type', facet.group='model.variable', facet.ncol=6,
+                color.var='sample.strategy', facet.col='model.variable', facet.row='variable.type',
+                facet.ragged='r',
+                strip='all_y',
+                axes='all_y',
+                scales='free_y',
+                # space='free',
+                independent='y',
+                legend.position='top',
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=2,
+        tabset_vars=nesting.vars,
+        output_var='figures'
+    )
+```
+
+# Elbow plots of CRD LEFs vs number of SVs regressed out
 First load all the data where we calcualted all decorate CRD LEFs from separate matrices with different sets of SVs regressed out i.e. {1}, {1,2}, {1,2,3,...N} etc. 
 Most matrices only had 1-4 SVs estimated.
 ```{r load_elbow_data}
