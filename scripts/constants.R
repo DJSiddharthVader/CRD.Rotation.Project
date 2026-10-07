@@ -2,6 +2,7 @@
 # Constants
 ############################################################
 NUM_SVS_TO_GENERATE <- 14 # number of OCRs / number of samples
+NUM_SVS_TO_REMOVE <- 5 # decided manually using elbow plots of SVs
 AD_PHENOTYPE_COLUMNS <- 
     c(
         'AD_CERAD_withDLB', 
