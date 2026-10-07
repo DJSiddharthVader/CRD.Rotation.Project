@@ -18,41 +18,6 @@ suppressPackageStartupMessages({
 })
 
 ###################################################
-# Transform data for plotting
-###################################################
-calc_pct <- function(
-    count.df,
-    cols_exclude=c(),
-    col_pct=NULL){
-    # count.df=n.TADCompare.df; cols_exclude=c('chr', 'DifferenceType', 'Enriched.Condition'); col_pct=NULL
-    # calculate relative frequency from count data
-    count.df %>% 
-    {
-        if ('n' %in% colnames(.)){
-            group_by(., across(-c(cols_exclude, 'n'))) %>% 
-            summarize(n=sum(n))
-        } else {
-            group_by(., across(-c(cols_exclude))) %>% 
-            count()
-        }
-    } %>% 
-    {
-        if (!is.null(col_pct)) {
-            ungroup(.) %>%
-            group_by(across(-c(col_pct, 'n')))
-        } else {
-            .
-        }
-    } %>% 
-    mutate(total=sum(n)) %>% 
-    ungroup() %>% 
-    mutate(pct=n / total) %>% 
-    mutate(n.label=glue('n = {n}')) %>% 
-    mutate(pct.label=glue('{round(100 * n / total, digits=1)}%')) %>% 
-    mutate(n.and.pct.label=glue('{pct.label}\n({n.label})'))
-}
-
-###################################################
 # Handling/formatting plots
 ###################################################
 make_ggtheme <- function(...){

@@ -280,44 +280,30 @@ run_decorate_pipeline <- function(
     return(results.obj)
 }
 
-############################################################
-# Misc posterity code
-############################################################
-sva_docs_example_correlations <- function() {
-    library(bladderbatch)
-    data(bladderdata)
-    pheno = pData(bladderEset)
-    edata = exprs(bladderEset)
-    mod = model.matrix(~as.factor(cancer), data=pheno)
-    mod0 = model.matrix(~1,data=pheno)
-    n.sv = num.sv(edata,mod,method="be"); n.sv
-    svobj = sva(edata,mod,mod0,n.sv=n.sv)
-    colnames(svobj$sv) <- paste0('SV', 1:n.sv)
-    canCorPairs(
-        paste(c('~ cancer', colnames(svobj$sv)), collapse='+'),
-        data=bind_cols(svobj$sv, pheno)
-    )
-    n.sv = num.sv(edata,mod,method="leek"); n.sv
-    svobj = sva(edata,mod,mod0,n.sv=n.sv)
-    colnames(svobj$sv) <- paste0('SV', 1:n.sv)
-    canCorPairs(
-        paste(c('~ cancer', colnames(svobj$sv)), collapse='+'),
-        data=bind_cols(svobj$sv, pheno)
-    )
-    # my function shich should be the same
-    run_sva(
-        sample.metadata=as_tibble(pheno ),
-        counts.matrix=edata,
-        full.model.vars=c('cancer'),
-        reduced.model.vars=NULL,
-    ) %>% 
-    as.data.frame() %>% 
-    column_to_rownames('SampleID') %>% 
-    {
-        canCorPairs(
-            paste(c('~ cancer', colnames(.)), collapse='+'),
-            data=bind_cols(., pheno)
-        )
-    }
+unpack_decorate_blob <- function(
+    filepath,
+    ...) {
+    results_dir <- dirname(filepath)
+    decorate.blob <- readRDS(filepath)
+    # peak <-> CRD (cluster) mapping
+    decorate.blob$all.clusters %>%
+        tidy_CRD_clusters() %>%
+        write_tsv(file.path(results_dir, 'all-decorate.CRDs.tsv'))
+    # CRD self-correlation stats 
+    decorate.blob$all.LEFs %>%
+        tidy_CRD_scores() %>%
+        write_tsv(file.path(results_dir, 'all-decorate.CRD.LEFs.tsv'))
+    # post filtering+collapsing by decorate
+    decorate.blob$filtered.clusters %>%
+        tidy_CRD_clusters() %>%
+        write_tsv(file.path(results_dir, 'filtered-decorate.CRDs.tsv'))
+    # stats for filtered CRDs
+    decorate.blob$filtered.LEFs %>%
+        tidy_CRD_scores() %>%
+        write_tsv(file.path(results_dir, 'filtered-decorate.CRD.LEFs.tsv'))
+    invisible(NULL)
+    # decorate.blob$tree.list %>%
+    #     tidy_decorate_tree.list() %>% 
+    #     write_tsv(file.path(results_dir, 'decorate.tree.list.tsv'))
 }
 
