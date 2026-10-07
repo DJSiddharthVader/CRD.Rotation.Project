@@ -1,34 +1,114 @@
 ---
-title: Surrogate Variable Analysis
+title: Surrogate Variable Titration Analysis
 author: "Siddharth Reed"
 date: "`r Sys.Date()`"
+keep-md: true
 lightbox: true
 format:
-  html:
-    fig-width: 9
-    fig-height: 5
-    smooth-scroll: true
-    toc: true
-    number_sections: true
-    code-fold: true
-    theme:
-        dark: darkly
-        light: flatly
+    html:
+        embed-resources: true
+        page-layout: full
+        toc: true
+        number_sections: true
+        code-fold: true
+        smooth-scroll: true
+        fig-width: 9
+        fig-height: 5
+        theme:
+            dark: darkly
+            light: flatly
 ---
 {{< include _imports.qmd >}}
 
-Load SVs and sample data
-```{r load_data}
+Set options for generating data in this notebook
+```{r notebook opts}
+plan(multisession, workers=TOTAL_CORES)
+FORCE_REDO <- FALSE
+# FORCE_REDO <- TRUE
+NOTEBOOK_CACHE_DIR <- 
+    here('results', 'notebook.cache', '01_Surrogate.Variable.Analysis')
+factorize_columns_for_plotting <- function(df, SV.groups=1) {
+    # categorize model variables for plotting
+    if ('model.variable' %in% colnames(df)) {
+        n.SVs <- 
+            df %>% distinct(model.variable) %>% filter(str_detect(model.variable, '^SV')) %>% nrow()
+        df %>% 
+        # columns for identifying SVs
+        mutate(
+            variable.type=
+                case_when(
+                    model.variable %in% ALL_PHENOTYPE_COLUMNS ~ 'phenotypes',
+                    str_detect(model.variable, '^SV')         ~ 'SVs',
+                    model.variable == 'Residuals'             ~ 'Residuals',
+                    .default='covariates'
+                ),
+            # split SVs into sub-levels for plotting
+            SV.index=
+                ifelse(
+                    variable.type == 'SVs',
+                    as.integer(str_remove(model.variable, '^SV')),
+                    NA
+                )
+        ) %>%
+        # split SVs into `SV.groups` chunks 
+        left_join(
+            tibble(SV.index=1:n.SVs) %>%
+            mutate(SV.bin=ntile(SV.index, SV.groups)),
+            by='SV.index'
+        ) %>% 
+        # create factor ordering columns for variables
+        mutate(
+            variable.type.order=
+                case_when(
+                    variable.type == 'Residuals'  ~ 0,
+                    variable.type == 'phenotypes' ~ 1,
+                    variable.type == 'covariates' ~ 2,
+                    variable.type == 'SVs'        ~ SV.bin+2,
+                    .default=NA
+                ),
+            model.variable.order=
+                case_when(
+                    variable.type == 'SVs' ~ as.integer(str_remove(model.variable, '^SV')) + 1,
+                    .default=variable.type.order 
+                )
+        ) %>%
+        # specify SV groupings in variable.type
+        group_by(SV.bin) %>% 
+        mutate(
+            variable.type=
+                ifelse(
+                    !is.na(SV.index),
+                    glue('SVs {min(SV.index)}-{max(SV.index)}'),
+                    variable.type
+                ),
+        ) %>%
+        ungroup() %>% 
+        # set desired factor ordering
+        mutate(
+            variable.type=fct_reorder(variable.type, variable.type.order),
+            model.variable=fct_reorder(model.variable, model.variable.order)
+        ) %>% 
+        # remove tmp columns 
+        select(-c(SV.index, SV.bin, model.variable.order, variable.type.order))
+    } else {
+        df
+    }
+}
+```
+Load sample metadata
+```{r load_metadata}
 all.sample.metadata <- 
     load_sample_metadata() %>%
+    order_variable_for_plotting() %>% 
     select(all_of(c('SampleID', RELEVANT_METADATA_COLUMNS)))
+all.sample.metadata
 ```
-
 Load all SVs
 ```{r load_SV_data}
 all.SVs.df <- 
     check_cached_results(
         results_file=here('results', 'all.SV.data.rds'),
+        force_redo=FORCE_REDO,
         # force_redo=TRUE,
         results_fnc=
             function() {
@@ -66,8 +146,15 @@ all.SVs.df <-
 
 # Correlation of SVs between sample sets
 
+Here we plot the correlation of SVs estimated on different set of samples, specifically we compare SVs estimated from AD samples only or Controls only to All samples.
+We only compare the SV correlations between common samples for each pair of different SV sets. 
+So comparing SVs estimated from disjoint (AD vs Control) input sample sets are by definition NULL because there are 0 overlapping samples, but we can compare SVs estimated from subsets i.e. All.Samples vs AD.Samples.
+It is interesting to see the strength of correlation between SVs from different sample subsets and how they drop off in strength after ~ 5.
+The direction of correlation is arbitrary and should not be interpreted biologically.
+
 ```{r compute_SV_SV_correlation}
 # #| eval: false
+
 compute_SV_correlations <- function(SVs.df.1, SVs.df.2, ...) {
     SVs.df.1 <- 
         SVs.df.1 %>% 
@@ -139,6 +226,7 @@ compute_all_SV_correlations <- function(all.SVs.df){
 SV.correlations.df <- 
     check_cached_results(
         results_file=file.path(NOTEBOOK_CACHE_DIR, 'all.SV.data.tsv'),
+        force_redo=FORCE_REDO,
         # force_redo=TRUE,
         results_fnc=compute_all_SV_correlations,
         all.SVs.df=all.SVs.df
@@ -161,14 +249,12 @@ SV.correlations.df <-
     )
 ```
 
-Here we plot the correlation of SVs estimated on different set of samples, specifically we compare SVs estimated from AD samples only or Controls only to All samples.
-We only compare the SV correlations between common samples for each pair of different SV sets.
-
-```{r plot_SV_SV_correlation}
+```{r plot_SV_SV_correlation, results='asis'}
 #| echo: false
-#| results: asis
 #| fig-width: 15
 #| fig-height: 15
+# #| eval: false
+
 # Now plot correlation of SVs across datasets
 nesting.vars <- 
     c(
@@ -178,11 +264,10 @@ nesting.vars <-
         'z.score.counts'
     )
 SV.correlations.df %>% 
-    # # only compare SVs esstimated on the same sample sets
-    # filter(comparison == sample.strategy.1) %>% 
+    filter(z.score.counts == 'zscore -> SVs') %>% 
+    order_variable_for_plotting() %>% 
     nest(plot.df=-all_of(nesting.vars)) %>% 
     mutate(
-        test=pmap(.l=list(plot.df), .f=~ glue('{nrow(.x)}x{ncol(.x)}')),
         figures=
             pmap(
                 .l=.,
@@ -206,26 +291,23 @@ SV.correlations.df %>%
                 .progress=TRUE
             )
     ) %>% 
-        {.} -> tmp; ggsave(here('test.pdf'), tmp$figures[[1]])
     custom_render_tabset(
-        tabset_vars=nesting.vars,
-        output_var='figures'
-        # output_var='test'
+        starting.hlevel=2,
+        output_var='figures',
+        tabset_vars=nesting.vars
     )
-    # render_tabset(
-    #     # tabset_vars=nesting.vars,
-    #     # heading_levels=c(1, rep(NA, length(nesting.vars))),
-    #     # tabset_vars=c('title', nesting.vars),
-    #     starting.hlevel=2,
-    #     tabset_vars=nesting.vars,
-    #     output_vars='figures'
-    # )
 ```
 
 # Correlation of SVs and Sample Metadata
 
+Here we plot the correlation of estimated SVs with various sample characteristics i.e. AD phenotypes, Age and model co-variates.
+As expected all SVs are completly orthoganl and RACE generally shows stronger associations with SVs than other variables, since it is never regressed out of the input matrix.
+It should be noted that some SVs do show "large" (>0.2) correlations with phenotypes variables or variables that were included when estimating the SVs.
+It should also be noted that this is not linear, i.e. some of the later SVs show stronger correlations for specific phenotypes than the earlier ones, but still ultimately capture less total variance in the input matrix as will be show in the next sections.
+
 ```{r compute_SV_metadata_correlation}
 # #| eval: false
+
 make_correlation_data <- function(SVs.df, model.vars, ...) {
     # SVs.df=all.SVs.df$SVs.df[[1]]; model.vars=c('sex', 'RACE', 'Biobank', ALL_PHENOTYPE_COLUMNS)
     for (variable in model.vars) {
@@ -241,11 +323,8 @@ make_correlation_data <- function(SVs.df, model.vars, ...) {
         )
     SVs.df %>% 
     canCorPairs(
-
         formula=sprintf('~ %s', paste(all.vars, collapse='+')) %>% formula(),
-
         data=.
-
     ) %>%
     as.data.frame() %>% 
     rownames_to_column('Var1') %>% 
@@ -316,64 +395,56 @@ factorize_for_plotting <- function(SV.correlations.df){
 SV.metadata.correlations.df <- 
     check_cached_results(
         results_file=file.path(NOTEBOOK_CACHE_DIR, 'all.SV.metadata.correlations.tsv'),
+        force_redo=FORCE_REDO,
         # force_redo=TRUE,
         results_fnc=compute_all_SV_metadata_correlations,
+        model.variables=RELEVANT_METADATA_COLUMNS,
         all.SVs.df=all.SVs.df
-    ) %>% 
-    filter(SVs.estimated == NUM_SVS_TO_GENERATE) %>% 
+    ) %>%
     factorize_for_plotting()
 ```
 
-Here we plot the correlation of estimated SVs with various sample characteristics e.g. AD phenotypes, Age and model co-variates. We previously showed that 
-
-```{r plot_SV_metadata_correlation}
-# #| eval: false
+```{r plot_SV_metadata_correlation, results='asis'}
 #| echo: false
-#| results: asis
-#| output: asis 
-#| fig-width: 15
-#| fig-height: 15
+#| fig-width: 8
+#| fig-height: 5
+# #| eval: false
 
 nesting.vars <- 
     c(
         'CPM.cutoff',
         'residual.model',
-        'AD.definition.column',
-        'sample.strategy',
+        # 'AD.definition.column',
+        # 'sample.strategy',
+        'var.comparison',
         'z.score.counts'
     )
 SV.metadata.correlations.df %>% 
-    mutate(corr.label=round(corr, 2)) %>% 
     filter(SVs.estimated == NUM_SVS_TO_GENERATE) %>% 
-    # nest(plot.df=-all_of(c(nesting.vars, 'residual.model', 'sample.strategy'))) %>% 
-    nest(plot.df=-all_of(c(nesting.vars))) %>% 
+    filter(z.score.counts == 'zscore -> SVs') %>% 
+    mutate(corr.label=round(corr, 2)) %>% 
+    order_variable_for_plotting() %>% 
+    nest(plot.df=-all_of(nesting.vars)) %>% 
     mutate(
         figures=
             pmap(
                 .l=.,
                 .f=plot_heatmap,
-                # facet.group='SVs.estimated', facet.ncol=7,
-                # facet.col='sample.strategy', facet.row='residual.model'
-                facet.col='var.comparison',
+                # facet.col='var.comparison', scales='free', space='fixed', independent='all',
+                facet.col='sample.strategy',
                 y.var='Var2',
                 x.var='Var1',
                 fill.var='corr', 
                 label.var='corr.label',
                 label.size=2,
                 label.color='white',
-                scales='free',
-                # space='free',
-                independent='all',
                 axis.text.x=element_text(angle=45, vjust=1, hjust=1),
                 axis.line=element_blank(),
                 axis.title=element_blank(),
                 .progress=TRUE
             )
     ) %>% 
-    add_column(title='Correlation of SVs and Sample Metadata') %>% 
-    render_tabset(
-        # heading_levels=c(1, rep(NA, length(nesting.vars))),
-        # tabset_vars=c('title', nesting.vars),
+    custom_render_tabset(
         starting.hlevel=2,
         tabset_vars=nesting.vars,
         output_vars='figures'

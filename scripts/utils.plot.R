@@ -1031,7 +1031,11 @@ plot_lineplot <- function(
             .
         }
     } %>% 
-    { . + geom_line(linewidth=linewidth) } %>% 
+    { 
+        . + 
+        geom_point(size=size, alpha=alpha) + 
+        geom_line(linewidth=linewidth) 
+    } %>% 
     # Handle faceting + scaling + theme options
     post_process_plot(
         scales=scales,
@@ -1049,9 +1053,8 @@ plot_ribbonplot <- function(
     alpha=0.5,
     size=0.5,
     linewidth=1,
-    scales='fixed',
+    # scales='fixed',
     ...){
-    # x.var='start'; x.scale.mode='mb'; y.var='nesting.lvl'; group.var='Sample.Group'; color.var='Genotype'; shape.var='Genotype'; facet.row='Edit';
     # make it a lineplot plot
     {
         ggplot(
@@ -1080,7 +1083,7 @@ plot_ribbonplot <- function(
     } %>% 
     # Handle faceting + scaling + theme options
     post_process_plot(
-        scales=scales,
+        # scales=scales,
         ...
     )
 }
