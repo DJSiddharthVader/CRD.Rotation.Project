@@ -33,7 +33,6 @@ DIFFERENTIAL_OCR_RESULTS_TSV_FILEPATH <-
 # Results output dirs
 #############################
 SVA_RESULTS_DIR                  <- here("results", "peak.SVs")
-ELBOW_RESULTS_DIR                <- here("results", "elbow.data")
 SV_VARIANCEPARTITION_RESULTS_DIR <- here("results", "SV.variancePartitions")
 SV_PEAK_STATS_DIR                <- here("results", "SV.peak.stats")
 CRD_RESULTS_DIR                  <- here("results", "decorate.CRDs")

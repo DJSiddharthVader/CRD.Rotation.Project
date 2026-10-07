@@ -485,7 +485,6 @@ all.peak.variance.results.df %>%
 ```
 
 ## How much peak variance do SVs capture?
-# CRD Elbow Plot of LEFs vs SVs
 
 Now we can inspect the distribution of variance explained by each model variable across all peaks when we DO NOT regress out any SVs from the input matrices. 
 So this figure shows the distribution across all peaks of how much variance is specifically captured by each phenotype, covariate and SV. 
@@ -698,26 +697,165 @@ all.varpar.results.df %>%
 ```
 
 # Elbow plots of CRD LEFs vs number of SVs regressed out
-First load all the data where we calcualted all decorate CRD LEFs from separate matrices with different sets of SVs regressed out i.e. {1}, {1,2}, {1,2,3,...N} etc. 
-Most matrices only had 1-4 SVs estimated.
-```{r load_elbow_data}
-#| eval: false
-#| cache: true
-all.elbow.data.df <- 
-    ELBOW_RESULTS_DIR %>% 
-    parse_results_filelist(
-        suffix='elbow.plot.data.tsv',
-        filename.column.name='filename'
-    ) %>%
-    dplyr::rename('elbow.filepath'=filepath) %>% 
-    select(-c(filename)) %>%
-    {read_tsv(.$elbow.filepath)} %>% count(SVs.included, meanClusterSize)
-```
-Here we build and elbow plot with showing the LEF distribution across peaks for each residual matrix with the specified SVs regressed out. This shows us 
-```{r plot_LEF_elbow}
-#| output: asis
-#| echo: false
-#| eval: false
 
+Now we can look at the actual CRDs and the "strength" their internal correlation and structure (LEFs) estimated from each SV-regressed matrix $R_{1 \dots N}$.
+Using these we can show how iteratively regressing out SVs affects the LEF distribution of the resulting CRDs.
+So for each input matrix $R_i$ with $i$ SVs regressed out we plot summary statistics of the `LEF` and `mean_abs_corr` scores across all CRDs in the genome.
+The tabs indicate whether any filtering/merging was applied to the CRDs by decorate before plotting or not.
+From the plot we can see an elbow pattern after about ~ 4-5 SVs across input matrices and CRD metrics.
+
+```{r load_elbow_data}
+# #| eval: false
+
+summarize_elbow_results <- function(
+    elbow.filepath,
+    ...){
+    # for each set of variance partition results, 
+    # compute summary statistics over variancePartitions of each Peak per model variable
+    # first load + tidy the CRD results
+    all.tidy.results.df <- 
+        elbow.filepath %>%
+        read_tsv(show_col_types=FALSE) %>% 
+        dplyr::rename(
+            'chr'=chrom,
+            'size'=N
+        ) %>% 
+        # mutate(ClusterID=glue('{chr}.{cluster}')) %>% 
+        pivot_longer(
+            c(size, LEF, mean_abs_corr, quantile75, quantile90, quantile95),
+            names_to='cluster.feature',
+            values_to='cluster.value'
+        ) %>%
+        # remove any NAs
+        filter(!is.na(cluster.value))
+    # now compute summary stats across all CRDs in the entire genome
+    gw.summaries <- 
+        all.tidy.results.df %>% 
+        group_by(across(-c(chr, cluster, cluster.value))) %>% 
+        summarize(
+            .groups='drop',
+            # stat.nCRDs=n(),
+            nCRDs=n(),
+            across(
+                .cols=c(cluster.value),
+                .names='stat.{.fn}',
+                .fns=STAT_SUMMARY_FNCS_LIST
+            )
+        )
+    # compute summary stats across all CRDs per chromosome
+    per.chr.summaries <- 
+        all.tidy.results.df %>% 
+        group_by(across(-c(cluster, cluster.value))) %>% 
+        summarize(
+            .groups='drop',
+            nCRDs=n(),
+            across(
+                .cols=c(cluster.value),
+                .names='stat.{.fn}',
+                .fns=STAT_SUMMARY_FNCS_LIST
+            )
+        )
+    # bind together, treat GW as a separate chr
+    list(
+        gw.summaries %>% add_column(chr='GW'),
+        per.chr.summaries
+    ) %>%
+    bind_rows() %>% 
+    pivot_longer(
+        starts_with('stat.'),
+        names_prefix='stat.',
+        names_to='stat',
+        values_to='value'
+    )
+}
+all.elbow.data.df <- 
+    check_cached_results(
+        results_file=file.path(NOTEBOOK_CACHE_DIR, 'all.elbow.data.tsv'),
+        force_redo=FORCE_REDO,
+        # force_redo=TRUE,
+        results_fnc=
+            function(){
+                list_all_results_files_in_set(set.name='SVs.elbow') %>%
+                mutate(
+                    elbow=
+                        future_pmap(
+                            .l=.,
+                            .f=summarize_elbow_results,
+                            .progress=TRUE
+                        )
+                ) %>% 
+                unnest(elbow)
+            }
+    ) %>% 
+    filter(
+        z.score.counts,
+        chr == 'GW',
+        stat %in% c('q25', 'mean', 'q75', 'sd'),
+        # cluster.feature %in% c('LEF')
+        cluster.feature %in% c('LEF', 'mean_abs_corr')
+        # cluster.feature %in% c('LEF', 'mean_abs_corr', 'size')
+    ) %>% 
+    factorize_columns_for_plotting() %>% 
+    mutate(
+        meanClusterSize=factor(meanClusterSize),
+        decorate.params=
+            DECORATE_HYPER_PARAMS_DF %>% 
+            colnames() %>%
+            {.[. != 'meanClusterSize']} %>%
+            paste0('{', ., '}', collapse='+') %>% 
+            glue()
+    ) %>% 
+    dplyr::rename('SVs.Regressed.Out'=SVs.included) %>% 
+    select(
+        CPM.cutoff, residual.model, AD.definition.column, sample.strategy,
+        z.score.counts, n.SVs, SVs.Regressed.Out,
+        decorate.params, meanClusterSize,
+        chr, nCRDs, 
+        cluster.feature, stat, value
+    )
+```
+
+```{r plot_LEF_elbow, results='asis'}
+#| echo: false
+#| fig-height: 6
+#| fig-width: 10
+# #| eval: false
+
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model'
+        # 'z.score.counts',
+        # 'cluster.feature'
+    )
+all.elbow.data.df %>% 
+    pivot_wider(names_from=stat, values_from=value) %>% 
+    # mutate(ymin=q25, ymax=q75) %>% 
+    mutate(ymin=mean - sd, ymax=mean + sd) %>% 
+    order_variable_for_plotting() %>% 
+    nest(plot.df=-all_of(nesting.vars)) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_lineplot,
+                # .f=plot_ribbonplot, ymin.var='ymin', ymax.var='ymax',
+                x.var='SVs.Regressed.Out',
+                y.var='mean', 
+                group.var='meanClusterSize',
+                color.var='meanClusterSize',
+                facet.col='sample.strategy', 
+                facet.row='cluster.feature',
+                scales='free_y',
+                plot.elements=list(geom_hline(yintercept=0.3, linewidth=0.15, linetype='dashed')),
+                size=0.9, linewidth=0.75,
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=2,
+        output_var='figures',
+        tabset_vars=nesting.vars
+    )
 ```
 

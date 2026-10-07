@@ -309,7 +309,6 @@ tidy_CRD_clusters <- function(clusters.obj) {
         peak.clusters=
             future_pmap(
                 .l=.,
-                .progress=FALSE,
                 .f=
                     function(meanClusterSize, ...) {
                         all.genome.clusters <- clusters.obj[[meanClusterSize]]
@@ -319,7 +318,7 @@ tidy_CRD_clusters <- function(clusters.obj) {
                         mutate(
                             clusters=
                                 pmap(
-                                    .l=,
+                                    .l=.,
                                     .f=
                                         function(chr, ...){
                                             all.genome.clusters[[chr]] %>% 
@@ -329,51 +328,13 @@ tidy_CRD_clusters <- function(clusters.obj) {
                                             )
                                         }
                                 )
-                        )
+                        ) %>%
+                        unnest(clusters)
                     }
             )
     ) %>%
     unnest(peak.clusters) %>% 
     mutate(ClusterID=glue('{chr}.{ClusterID}'))
-}
-
-generate_LEFs_only_with_decorate <- function(
-    peak.residuals.mx,
-    peak.locations,
-    adjacentCount,
-    method.corr,
-    clusterMethod,
-    meanClusterSize,
-    BPPARAM=SerialParam(),
-    ...){
-    # Evaluate hierarchical clustering
-    # adjacentCount is the number of adjacent peaks considered in correlation
-    # use Spearman correlation to reduce the effects of outliers
-    # peak.residuals.mx=peak.data$residuals; peak.locations=peak.data$locations;
-    tree.list <- 
-        peak.residuals.mx %>% 
-        runOrderedClusteringGenome( 
-            peak.locations,
-            adjacentCount=adjacentCount,
-            method.corr=method.corr
-        )
-    # Choose cutoffs and return clusters using multiple values for meanClusterSize 
-    # Clusters corresponding to each parameter value are returned and then processed downstream
-    # By using multiple parameter values, epigenetic features are included in clusters 
-    all.tree.list.clusters <- 
-    # at different resolutions
-        tree.list %>% 
-        createClusters(
-            method=clusterMethod,
-            meanClusterSize=meanClusterSize
-        )
-    # return clusters + LEFs across meanClusterSizes as tibble
-    tree.list %>% 
-    scoreClusters(
-        all.tree.list.clusters,
-        BPPARAM=BPPARAM
-    ) %>% 
-    tidy_CRD_scores()
 }
 
 generate_peak_cluster_with_decorate <- function(
@@ -428,12 +389,19 @@ generate_peak_cluster_with_decorate <- function(
             peak.locations,
             jaccardCutoff=jaccardCutoff
         )
+    filtered.scores <- 
+        tree.list %>% 
+        scoreClusters(
+            filtered.tree.list.clusters,
+            BPPARAM=BPPARAM
+        )
     # return all data
     list(
-        cluster.LEFs=tidy_CRD_scores(tree.scores),
         tree.list=tree.list,
         all.clusters=all.tree.list.clusters,
-        filtered.clusters=filtered.tree.list.clusters
+        all.LEFs=tree.scores,
+        filtered.clusters=filtered.tree.list.clusters,
+        filtered.LEFs=filtered.scores
     )
 }
 
@@ -445,7 +413,7 @@ run_decorate_pipeline <- function(
     AD.definition.column='AD_CERAD_withDLB',
     sample.strategy='All',
     SVs.included=Inf,
-    LEFs.only=FALSE,
+    # LEFs.only=FALSE,
     p=NULL,
     ...) {
     # subset + order data as defined
@@ -476,22 +444,12 @@ run_decorate_pipeline <- function(
     } else {
         stop(glue('SVs.included must be an integer, passed: {SVs.included}'))
     }
-    # generate peak clusters, either just the cluster LEF scores or the full blob with peak-clusters
-    if (LEFs.only) {
-        results.obj <- 
-            generate_LEFs_only_with_decorate(
-                peak.residuals.mx=peak.residuals.mx,
-                peak.locations=peak.data$locations,
-                ...
-            )
-    } else {
-        results.obj <- 
-            generate_peak_cluster_with_decorate(
-                peak.residuals.mx=peak.residuals.mx,
-                peak.locations=peak.data$locations,
-                ...
-            )
-    }
+    results.obj <- 
+        generate_peak_cluster_with_decorate(
+            peak.residuals.mx=peak.residuals.mx,
+            peak.locations=peak.data$locations,
+            ...
+        )
     if (!is.null(p)) { p() }
     return(results.obj)
 }
