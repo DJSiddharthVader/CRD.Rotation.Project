@@ -40,10 +40,10 @@ peak.matrices.df %>%
             ),
         results_file=file.path(results_dir, 'peak.residual.SVs.tsv')
     ) %>% 
-    # pmap(
     future_pmap(
         .f=check_cached_results,
         # force_redo=TRUE,
+        return_data=FALSE,
         results_fnc=run_sva_on_peak_residuals,
         sample.metadata=all.sample.metadata,
         full.SV.model.vars=ALL_PHENOTYPE_COLUMNS,
