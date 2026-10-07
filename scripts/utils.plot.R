@@ -444,30 +444,8 @@ post_process_plot <- function(
 ###################################################
 # Modified quartabs render_tabset() function
 ###################################################
-buffer_nls <- function(stri, nl.delim='\n') {
-    cat(nl.delim)
-    cat(stri)
-    cat(nl.delim)
-}
-
-make_heading <- function(label, level) {
-  stopifnot(
-    "`level` must be an integer from 1 through 7." =
-      length(level) == 1L &&
-        !is.na(level) &&
-        level == as.integer(level) &&
-        level >= 1L &&
-        level <= 7L
-  )
-
-  paste0(
-    strrep("#", as.integer(level)),
-    " ",
-    as.character(label)
-  )
-}
-
 make_tabset_div <- function(
+    level,
     pills=FALSE,
     tabset_width="default") {
     stopifnot(
@@ -491,30 +469,36 @@ make_tabset_div <- function(
     if (identical(tabset_width, "justified")) {
     classes <- c(classes, ".panel-tabset-justified")
     }
-    paste0("::: {", paste(classes, collapse = " "), "}")
+    fence <- rep(':', level) %>% paste0(collapse='')
+    paste0(fence, " {", paste(classes, collapse = " "), "}")
+    # paste0("::: {", paste(classes, collapse = " "), "}")
 }
 
-render_tabsets_basecase <- function(
-    data,
-    output_var,
-    current.variable, 
-    hlevel,
-    nl.delim,
-    ...){
-    # pirnt all output variables specified under each level heading for this variable
-    data %>%
-        nest(output=-all_of(current.variable)) %>%
-        mutate(current.level=!!sym(current.variable)) %>% 
-        pmap(
-            .l=.,
-            .f=
-                function(current.level, output, ...) {
-                    make_heading(current.level, hlevel) %>% buffer_nls(nl.delim=nl.delim)
-                    output %>%
-                    pull(output_var) %>% 
-                    print()
-                }
+make_fence <- function(level, bottom=FALSE){
+    fence <- strrep(":", level)
+    if (bottom) {
+        cat(fence, "\n\n", sep="")
+    } else {
+        cat(fence, " {.panel-tabset}\n\n", sep="")
+    }
+}
+
+make_heading <- function(label, level){
+    stopifnot(
+        "`level` must be an integer from 1 through 7." =
+            length(level) == 1L &&
+            !is.na(level) &&
+            level == as.integer(level) &&
+            level >= 1L &&
+            level <= 7L
+    )
+    header <- 
+        paste0(
+            strrep("#", as.integer(level)),
+            " ",
+            as.character(label)
         )
+    cat(header, '\n\n', sep="")
 }
 
 render_tabsets_recursively <- function(
@@ -522,45 +506,60 @@ render_tabsets_recursively <- function(
     tabset_vars,
     output_var,
     hlevel,
-    layout,
-    pills,
-    tabset_width,
-    nl.delim,
+    flevel,
     ...){
     current.variable <- tabset_vars[1]
-    if (!is.null(layout)) { layout %>% buffer_nls(nl.delim=nl.delim) }
-    make_tabset_div(pills=pills, tabset_width=tabset_width) %>%  buffer_nls(nl.delim=nl.delim)
-    make_heading(current.variable, hlevel) %>% buffer_nls(nl.delim=nl.delim)
-    if (length(tabset_vars) == 1) {
-        render_tabsets_basecase(
-            data=data,
-            output_var=output_var,
-            current.variable=current.variable,
-            hlevel=hlevel+1,
-            nl.delim=nl.delim
-        )
     # recursive case, keep descending + printing titles until the bottom is reached
+    if (length(tabset_vars) == 1) {
+        make_fence(flevel)
+        # pmap(
+        #     .l=list(current.value=unique(data[[current.variable]])),
+        data[[current.variable]] %>%
+        { if (is.factor(.)) { levels(.) } else { unique(.) } } %>% 
+        list() %>% 
+        pmap(
+            .l=.,
+            .f=
+                function(current.value) {
+                    make_heading(current.value, hlevel)
+                    data %>% 
+                    filter(!!sym(current.variable) == current.value) %>% 
+                    pull(output_var) %>%
+                    {.[[1]]} %>% 
+                    print()
+                    cat('\n\n')
+                }
+        )
+        make_fence(flevel, bottom=TRUE)
     } else {
-            data[[current.variable]] %>%
-            unique() %>%
-            list() %>% 
-            pmap(
-                .l=.,
-                .f=render_tabsets_recursively,
-                # data=data %>% filter(data[[current.variable]] == current.level),
-                data=data,
-                tabset_vars=tabset_vars[2:length(tabset_vars)],
-                output_var=output_var,
-                hlevel=hlevel+1,
-                layout=layout,
-                pills=pills,
-                tabset_width=tabset_width,
-                nl.delim=nl.delim,
-                ...
-            )
+        make_fence(flevel)
+        # pmap(
+        #     .l=list(current.value=unique(data[[current.variable]])),
+        data[[current.variable]] %>%
+        { if (is.factor(.)) { levels(.) } else { unique(.) } } %>% 
+        list() %>% 
+        pmap(
+            .l=.,
+            .f=
+                function(current.value, data, current.variable, hlevel, ...){
+                    make_heading(current.value, hlevel)
+                    data %>% 
+                    filter(!!sym(current.variable) == current.value) %>% 
+                    render_tabsets_recursively(
+                        hlevel=hlevel+1,
+                        ...
+                    )
+                },
+            current.variable=current.variable,
+            data=data,
+            tabset_vars=tabset_vars[2:length(tabset_vars)],
+            output_var=output_var,
+            flevel=flevel-1,
+            hlevel=hlevel,
+            ...
+        )
+        make_fence(flevel, bottom=TRUE)
     }
-    ":::" %>% buffer_nls(nl.delim=nl.delim)
-    if (!is.null(layout)) { sub("^(:+).*", "\\1", layout) %>%  buffer_nls(nl.delim=nl.delim) }
 }
 
 custom_render_tabset <- function(
@@ -568,31 +567,40 @@ custom_render_tabset <- function(
     tabset_vars,
     output_var='figures',
     starting.hlevel=2,
-    nl.delim='\n',
-    layout=NULL,
-    pills=FALSE,
-    tabset_width="default",
     ...){
     # get nesting info
     current.variable <- tabset_vars[1]
+    starting.fence.level <- length(tabset_vars) - 1 + 3
     # print quarto section headers 
-    if (!is.null(layout)) { layout %>% buffer_nls(nl.delim=nl.delim) }
-    make_tabset_div(pills=pills, tabset_width=tabset_width) %>% buffer_nls(nl.delim=nl.delim)
-    make_heading(current.variable, starting.hlevel) %>% buffer_nls(nl.delim=nl.delim)
-    render_tabsets_recursively(
+    cat('\n\n')
+    make_fence(starting.fence.level)
+    # pmap(
+    #     .l=.,
+    data[[current.variable]] %>%
+    { if (is.factor(.)) { levels(.) } else { unique(.) } } %>% 
+    list() %>% 
+    pmap(
+        .l=.,
+        .f=
+            function(current.value, data, current.variable, hlevel, ...){
+                make_heading(current.value, hlevel) 
+                data %>% 
+                filter(!!sym(current.variable) == current.value) %>% 
+                render_tabsets_recursively(
+                    hlevel=hlevel+1,
+                    ...
+                )
+            },
         data=data,
         tabset_vars=tabset_vars[2:length(tabset_vars)],
         output_var=output_var,
         current.variable=current.variable,
-        hlevel=starting.hlevel+1,
-        layout=layout,
-        pills=pills,
-        tabset_width=tabset_width,
-        nl.delim=nl.delim,
+        flevel=starting.fence.level-1,
+        hlevel=starting.hlevel,
         ...
     )
-    ":::" %>% buffer_nls(nl.delim=nl.delim)
-    if (!is.null(layout)) { sub("^(:+).*", "\\1", layout) %>%  buffer_nls(nl.delim=nl.delim) }
+    make_fence(starting.fence.level, bottom=TRUE)
+    cat('\n\n')
 }
 
 ###################################################
