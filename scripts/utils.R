@@ -288,36 +288,41 @@ list_all_ATAC_datasets <- function(){
 list_all_results_files_in_set <- function(
     set.name,
     ...){
+    # List all filepaths to SVs estimated
     if (set.name == 'SVs') {
         SVA_RESULTS_DIR %>% 
-        parse_results_filelist(
-            ...,
-            suffix='peak.residual.SVs.tsv'
-        ) %>%
+        parse_results_filelist(suffix='peak.residual.SVs.tsv') %>%
         dplyr::rename('SVs.filepath'=filepath) %>% 
-        select(-c(filename))
-    } else if (set.name == 'SVs.elbow') {
-        ELBOW_RESULTS_DIR %>% 
-        # CRD_RESULTS_DIR %>% 
-        parse_results_filelist(
-            ...,
-            suffix='elbow.cluster.data.tsv',
-            filename.column.name='filename'
-        ) # %>% select(-c(filename))
+        select(-c(filename)) 
+    # List all filepaths to variancePartition results after iteratively regressing out SVs
     } else if (set.name == 'SVs.variancePartition') {
         SV_VARIANCEPARTITION_RESULTS_DIR %>% 
-        parse_results_filelist(
-            ...,
-            suffix='SV.variance.partition.results.tsv',
-            filename.column.name='filename'
-        ) %>% 
+        parse_results_filelist(suffix='SV.variance.partition.results.tsv') %>% 
+        dplyr::rename('SV.variancePartition.filepath'=filepath) %>%  
         select(-c(filename))
+    # List all CRD objects with clusters + filtered clusters + LEFs
     } else if (set.name == 'CRD.blobs') {
         CRD_RESULTS_DIR %>%
+        parse_results_filelist(suffix='decorate.blob.rds') %>% 
+        dplyr::rename('decorate.blob.filepath'=filepath)  %>% 
+        select(-c(filename))
+    # List all LEFs results extracted from blobs after iteratively regressing out SVs
+    } else if (set.name == 'SVs.elbow') {
+        CRD_RESULTS_DIR %>% 
+        parse_results_filelist(suffix='decorate.CRD.LEFs.tsv') %>% 
+        dplyr::rename('elbow.filepath'=filepath) %>% 
+        select(-c(filename))
+    } else if (set.name == 'CRDs') {
+        CRD_RESULTS_DIR %>% 
         parse_results_filelist(
-            ...,
-            suffix='decorate.cluster.blob.rds'
+            suffix='-decorate.CRDs.tsv',
+            filename.column.name='is.decorate.filtered'
         ) %>% 
+        dplyr::rename('clusters.filepath'=filepath)
+    } else if (set.name == 'peak.variance.stats') {
+        SV_PEAK_STATS_DIR %>% 
+        parse_results_filelist(suffix='peak.stats.with.SVs.removed.tsv') %>% 
+        dplyr::rename('peak.stats.filepath'=filepath) %>% 
         select(-c(filename))
     # } else if (set.name == '') {
     } else {
