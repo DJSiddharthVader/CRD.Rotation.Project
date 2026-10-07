@@ -18,7 +18,8 @@ all.input.and.parameter.combinations.df <-
     cross_join(RESIDUAL_MATRIX_SAMPLE_PARAMS_DF) %>% 
     # map files with estimated SVs to the corresponding residual matrices
     inner_join(
-        list_all_results_files_in_set(set.name='SVs'),
+        list_all_results_files_in_set(set.name='SVs') %>%
+        dplyr::rename('SVs.filepath'=filepath),
         by=
             join_by(
                 CPM.cutoff,
