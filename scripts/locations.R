@@ -1,7 +1,16 @@
 #############################
-# Relevant directories
+# Relevant Directories
 #############################
-# PROJECT_DIR <- "/sc/arion/projects/Microglia/CRD.Analysis.Sid.Rotation"
+INPUT_DATA_DIR                   <- here("input.data")
+# Results Dirs
+SVA_RESULTS_DIR                  <- here("results", "peak.SVs")
+SV_VARIANCEPARTITION_RESULTS_DIR <- here("results", "SV.variancePartitions")
+SV_PEAK_STATS_DIR                <- here("results", "SV.peak.stats")
+CRD_RESULTS_DIR                  <- here("results", "decorate.CRDs")
+
+#############################
+# Input data
+#############################
 RESIDUALS_DIR <- 
     here(
         '..',
@@ -10,11 +19,10 @@ RESIDUALS_DIR <-
         "Data_processing",
         "files"
     )
-SAMPLE_METADATA_RDS_FILEPATH <- 
-    file.path(RESIDUALS_DIR, "AllInfo_ATACseq_processing_209x362.RDs")
-SAMPLE_METADATA_TSV_FILEPATH <- 
-    here("all.sample.metadata.tsv")
-DIFFERENTIAL_OCR_RESULTS_RDS_FILEPATH <- 
+SAMPLE_METADATA_RDS_FILEPATH  <- file.path(RESIDUALS_DIR, "AllInfo_ATACseq_processing_209x362.RDs")
+SAMPLE_METADATA_TSV_FILEPATH  <- file.path(INPUT_DATA_DIR, "all.sample.metadata.tsv")
+PEAK_METADATA_TSV_FILEPATH    <- file.path(INPUT_DATA_DIR, "all.peak.metadata.tsv")
+DIFFERENTIAL_OCR_RDS_FILEPATH <- 
     here(
         '..',
         "Combined_RNAseq_ATACseq",
@@ -24,15 +32,6 @@ DIFFERENTIAL_OCR_RESULTS_RDS_FILEPATH <-
         "DEG_results",
         "CombinedDEGresult_GCv38_ATACseq_over45y_3CPM_List_08_20_26.RDs"
     )
-DIFFERENTIAL_OCR_RESULTS_TSV_FILEPATH <- 
-    here(
-        'results',
-        'differential.OCR.results.tsv'
-    )
-#############################
-# Results output dirs
-#############################
-SVA_RESULTS_DIR                  <- here("results", "peak.SVs")
-SV_VARIANCEPARTITION_RESULTS_DIR <- here("results", "SV.variancePartitions")
-SV_PEAK_STATS_DIR                <- here("results", "SV.peak.stats")
-CRD_RESULTS_DIR                  <- here("results", "decorate.CRDs")
+DIFFERENTIAL_OCR_TSV_FILEPATH <- file.path(INPUT_DATA_DIR, 'differential.OCR.results.tsv')
+ALL_CRD_PEAKLISTS_AND_LOCATIONS_FILEPATH <- here('results', 'all.CRDs.rds')
+ALL_CRD_STATS_TSV_FILEPATH <- here('results', 'all.CRD.stats.tsv')
