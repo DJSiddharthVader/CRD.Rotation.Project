@@ -21,3 +21,4 @@ rv/
 /notebooks/*.rmarkdown
 /notebooks/*.md
 /notebooks/Rplots.pdf
+/input.data
