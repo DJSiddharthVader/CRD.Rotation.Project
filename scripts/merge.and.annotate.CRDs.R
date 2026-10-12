@@ -5,7 +5,8 @@ library(here)
 source(here('scripts', 'basic.imports.R'))
 source(here('scripts', 'utils.decorate.R'))
 # load patient metadata
-all.sample.metadata <- load_sample_metadata()
+all.sample.metadata <- 
+    load_sample_metadata()
 
 ############################################################
 # List all generated CRD results

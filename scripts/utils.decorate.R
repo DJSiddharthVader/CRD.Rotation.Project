@@ -90,7 +90,7 @@ subset_peak_data <- function(
 }
 
 ############################################################
-# Generate decorate clusters
+# Generate decorate CRDs
 ############################################################
 tidy_CRD_scores <- function(scores.obj){
     scores.obj %>% 
@@ -99,13 +99,12 @@ tidy_CRD_scores <- function(scores.obj){
         value='scores'
     ) %>% 
     unnest(scores) %>%
-    as_tibble() %>%
-    select(-c(id))
+    as_tibble() # %>% select(-c(id))
 }
 
 tidy_CRD_clusters <- function(clusters.obj) {
     # every row is assignment for a single peak to a CRD
-    # columns: meanClusterSize, chr, PeakID, ClusterID
+    # columns: meanClusterSize, chr, PeakID, CRDID
     clusters.obj %>%
     names() %>% 
     tibble(meanClusterSize=.) %>% 
@@ -138,7 +137,10 @@ tidy_CRD_clusters <- function(clusters.obj) {
             )
     ) %>%
     unnest(peak.clusters) %>% 
-    mutate(ClusterID=glue('{chr}.{ClusterID}'))
+    mutate(CRDID=glue(CRDID_GLUE_DEFINITION))
+    # mutate(CRDID=glue('{chr}.{CRDID}'))
+}
+
 }
 
 generate_peak_cluster_with_decorate <- function(
@@ -175,12 +177,16 @@ generate_peak_cluster_with_decorate <- function(
             method=clusterMethod,
             meanClusterSize=meanClusterSize
         )
+    # Get "scores" for each CRD from analyzing the OCR correlation matrix 
+    # defines the internal correlation and "strength" of each CRD
     tree.scores <- 
         tree.list %>% 
         scoreClusters(
-            all.tree.list.clusters,
+            treeList=.,
+            treeListClusters=all.tree.list.clusters,
             BPPARAM=BPPARAM
         )
+    # Remove clusters scores below thresholds and collapse any clusters that overlap 
     filtered.tree.list.clusters <- 
         tree.scores %>% 
         retainClusters( 
@@ -189,24 +195,29 @@ generate_peak_cluster_with_decorate <- function(
         ) %>% 
         # get retained clusters
         filterClusters(all.tree.list.clusters, .) %>% 
-        # collapse redundant clusters
+        # collapse redundant clusters i.e. any pair of clusters with > jaccardCutoff
         collapseClusters(
             peak.locations,
             jaccardCutoff=jaccardCutoff
         )
-    filtered.scores <- 
-        tree.list %>% 
-        scoreClusters(
-            filtered.tree.list.clusters,
-            BPPARAM=BPPARAM
-        )
-    # return all data
+    
+    # Score the filtered + colllapsed CRDs 
+    # THINK THIS BREAKS BECAUSE OF A BUG IN DECORATE SEE ./scratch.R
+    # filtered.scores <- 
+    #     tree.list %>% 
+    #     scoreClusters(
+    #         treeList=.,
+    #         treeListClusters=filtered.tree.list.clusters,
+    #         BPPARAM=BPPARAM
+    #     )
+    # return all data to be saved as an .rds object
+    # some of these can saved as a individual tsvs, which we do later
     list(
-        tree.list=tree.list,
         all.clusters=all.tree.list.clusters,
         all.LEFs=tree.scores,
         filtered.clusters=filtered.tree.list.clusters,
-        filtered.LEFs=filtered.scores
+        # filtered.LEFs=filtered.scores,
+        tree.list=tree.list
     )
 }
 
@@ -222,7 +233,6 @@ run_decorate_pipeline <- function(
     p=NULL,
     ...) {
     # paste0(c('row.index=1', paste0(colnames(tmp), '=tmp$', colnames(tmp), '[[row.index]]', collapse='; ')), collapse='; ')
-    # row.index=1; residuals.filepath=tmp$residuals.filepath[[row.index]]; residual.model=tmp$residual.model[[row.index]]; CPM.cutoff=tmp$CPM.cutoff[[row.index]]; coords.filepath=tmp$coords.filepath[[row.index]]; sample.strategy=tmp$sample.strategy[[row.index]]; AD.definition.column=tmp$AD.definition.column[[row.index]]; SVs.filepath=tmp$SVs.filepath[[row.index]]; n.SVs=tmp$n.SVs[[row.index]]; z.score.counts=tmp$z.score.counts[[row.index]]; SVs.included=tmp$SVs.included[[row.index]]; adjacentCount=tmp$adjacentCount[[row.index]]; method.corr=tmp$method.corr[[row.index]]; clusterMethod=tmp$clusterMethod[[row.index]]; meanClusterSize=tmp$meanClusterSize[[row.index]]; filterMetric=tmp$filterMetric[[row.index]]; filterMetricCutoff=tmp$filterMetricCutoff[[row.index]]; jaccardCutoff=tmp$jaccardCutoff[[row.index]]; results_dir=tmp$results_dir[[row.index]]; results_file=tmp$results_file[[row.index]]
     # subset + order data as defined
     peak.data <- 
         subset_peak_data(
@@ -255,25 +265,25 @@ run_decorate_pipeline <- function(
         generate_peak_cluster_with_decorate(
             peak.residuals.mx=peak.residuals.mx,
             peak.locations=peak.data$locations,
-            # ...
-            # colnames(tmp) %>% tibble(name=.)
-            residuals.filepath=residuals.filepath,
-            residual.model  =residual.model    ,
-            CPM.cutoff      =CPM.cutoff        ,
-            coords.filepath =coords.filepath   ,
-            sample.strategy =sample.strategy   ,
-            AD.definition.colum=AD.definition.colum,
-            SVs.filepath    =SVs.filepath      ,
-            n.SVs           =n.SVs             ,
-            z.score.counts  =z.score.counts    ,
-            SVs.included    =SVs.included      ,
-            adjacentCount   =adjacentCount     ,
-            method.corr     =method.corr       ,
-            clusterMethod   =clusterMethod     ,
-            meanClusterSize =meanClusterSize   ,
-            filterMetric    =filterMetric      ,
-            filterMetricCutoff=filterMetricCutoff,
-            jaccardCutoff   =jaccardCutoff     
+            ...
+            # # colnames(tmp) %>% tibble(name=.)
+            # residuals.filepath=residuals.filepath,
+            # residual.model  =residual.model    ,
+            # CPM.cutoff      =CPM.cutoff        ,
+            # coords.filepath =coords.filepath   ,
+            # sample.strategy =sample.strategy   ,
+            # AD.definition.colum=AD.definition.colum,
+            # SVs.filepath    =SVs.filepath      ,
+            # n.SVs           =n.SVs             ,
+            # z.score.counts  =z.score.counts    ,
+            # SVs.included    =SVs.included      ,
+            # adjacentCount   =adjacentCount     ,
+            # method.corr     =method.corr       ,
+            # clusterMethod   =clusterMethod     ,
+            # meanClusterSize =meanClusterSize   ,
+            # filterMetric    =filterMetric      ,
+            # filterMetricCutoff=filterMetricCutoff,
+            # jaccardCutoff   =jaccardCutoff     
         )
     if (!is.null(p)) { p() }
     message(names(results.obj))
@@ -281,14 +291,20 @@ run_decorate_pipeline <- function(
 }
 
 unpack_decorate_blob <- function(
-    filepath,
+    decorate.blob.filepath,
+    all.peak.locations.granges,
     ...) {
-    results_dir <- dirname(filepath)
-    decorate.blob <- readRDS(filepath)
+    # decorate.blob.filepath=tmp$decorate.blob.filepath[[1]];
+    results_dir <- dirname(decorate.blob.filepath)
+    decorate.blob <- readRDS(decorate.blob.filepath)
     # peak <-> CRD (cluster) mapping
     decorate.blob$all.clusters %>%
         tidy_CRD_clusters() %>%
-        write_tsv(file.path(results_dir, 'all-decorate.CRDs.tsv'))
+        write_tsv(file.path(results_dir, 'all-PeakList-decorate.CRDs.tsv'))
+    # CRDs decinfed by their genomic coordinates
+    decorate.blob$all.clusters %>%
+        convert_PeakList_to_Locations(all.peak.locations.granges) %>% 
+        write_tsv(file.path(results_dir, 'all-Locations-decorate.CRDs.tsv'))
     # CRD self-correlation stats 
     decorate.blob$all.LEFs %>%
         tidy_CRD_scores() %>%
@@ -296,7 +312,11 @@ unpack_decorate_blob <- function(
     # post filtering+collapsing by decorate
     decorate.blob$filtered.clusters %>%
         tidy_CRD_clusters() %>%
-        write_tsv(file.path(results_dir, 'filtered-decorate.CRDs.tsv'))
+        write_tsv(file.path(results_dir, 'filtered-PeakList-decorate.CRDs.tsv'))
+    # CRDs decinfed by their genomic coordinates
+    decorate.blob$filtered.clusters %>%
+        convert_PeakList_to_Locations(all.peak.locations.granges) %>% 
+        write_tsv(file.path(results_dir, 'filtered-Locations-decorate.CRDs.tsv'))
     # stats for filtered CRDs
     decorate.blob$filtered.LEFs %>%
         tidy_CRD_scores() %>%

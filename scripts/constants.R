@@ -1,6 +1,8 @@
 ############################################################
 # Constants
 ############################################################
+CRDID_GLUE_DEFINITION <- '{chr}.{ClusterID}'
+# CRDID_GLUE_DEFINITION <- '{meanClusterSize}_{chr}_{ClusterID}'
 NUM_SVS_TO_GENERATE <- 14 # number of OCRs / number of samples
 NUM_SVS_TO_REMOVE <- 5 # decided manually using elbow plots of SVs
 AD_PHENOTYPE_COLUMNS <- 
@@ -100,13 +102,13 @@ DECORATE_HYPER_PARAMS_DF <-
 STAT_SUMMARY_FNCS_LIST <- 
     c(
         'min'=min, 
-        'q05'=~ quantile(.x, probs=0.05),
-        'q25'=~ quantile(.x, probs=0.25),
+        'q05'=~ quantile(.x, na.rm=TRUE, probs=0.05),
+        'q25'=~ quantile(.x, na.rm=TRUE, probs=0.25),
         'mean'=mean, 'med'=median, 
-        'q75'=~ quantile(.x, probs=0.75),
-        'q95'=~ quantile(.x, probs=0.95),
+        'q75'=~ quantile(.x, na.rm=TRUE, probs=0.75),
+        'q95'=~ quantile(.x, na.rm=TRUE, probs=0.95),
         'max'=max,
         'var'=var, 'sd'=sd,
-        'total'=~ sum(abs(.x))
+        'total'=~ sum(abs(.x), na.rm=TRUE)
     )
 

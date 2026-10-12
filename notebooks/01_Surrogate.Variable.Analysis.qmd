@@ -85,7 +85,7 @@ Load all SVs
 ```{r load_SV_data}
 all.SVs.df <- 
     check_cached_results(
-        results_file=here('results', 'all.SV.data.rds'),
+        results_file=file.path(NOTEBOOK_CACHE_DIR, 'all.SV.data.rds'),
         force_redo=FORCE_REDO,
         # force_redo=TRUE,
         results_fnc=
@@ -255,9 +255,6 @@ SV.correlations.df %>%
                 x.var='SVs.1',
                 y.var='SVs.2',
                 fill.var='cor', 
-                # label.var='cor.label',
-                # label.size=2,
-                # label.color='black',
                 scales='free',
                 space='free',
                 # independent='all',
@@ -606,14 +603,13 @@ varpar.results.df %>%
                 y.var='variance.explained', 
                 fill.var='variable.type',
                 facet.col='variable.type',
-                scales='free',
-                space='free',
-                independent='all',
+                scales='free_x',
+                space='free_x',
+                # independent='all',
                 axis.text.x=element_text(angle=45, hjust=1),
                 .progress=TRUE
             )
     ) %>% 
-        # {.} -> tmp
     custom_render_tabset(
         starting.hlevel=3,
         tabset_vars=nesting.vars,
@@ -845,15 +841,7 @@ all.elbow.data.df <-
         # cluster.feature %in% c('LEF', 'mean_abs_corr', 'size')
     ) %>% 
     factorize_columns_for_plotting() %>% 
-    mutate(
-        meanClusterSize=factor(meanClusterSize),
-        decorate.params=
-            DECORATE_HYPER_PARAMS_DF %>% 
-            colnames() %>%
-            {.[. != 'meanClusterSize']} %>%
-            paste0('{', ., '}', collapse='+') %>% 
-            glue()
-    ) %>% 
+    clean_decorate_param_columns() %>% 
     dplyr::rename('SVs.Regressed.Out'=SVs.included) %>% 
     select(
         CPM.cutoff, residual.model, AD.definition.column, sample.strategy,

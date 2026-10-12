@@ -151,7 +151,7 @@ set_col_levels <- function(df, col.name) {
     if (col.name  %in% colnames(df)) {
         col.levels <- ALL_VARIABLE_ORDERINGS[[col.name]]
         if (!is.null(col.levels)) {
-            df %>% mutate(!!col.name := factor(!!sym(col.name), levels=col.levels))
+            df %>% mutate(!!col.name := fct_drop(factor(!!sym(col.name), levels=col.levels)))
         } else {
             df %>% mutate(!!col.name := as.integer(!!sym(col.name)))
         }
@@ -294,17 +294,17 @@ list_all_results_files_in_set <- function(
         parse_results_filelist(suffix='peak.residual.SVs.tsv') %>%
         dplyr::rename('SVs.filepath'=filepath) %>% 
         select(-c(filename)) 
+    # List computed variance of each peak's abundance across SVs residualized
+    } else if (set.name == 'peak.variance.stats') {
+        SV_PEAK_STATS_DIR %>% 
+        parse_results_filelist(suffix='peak.stats.with.SVs.removed.tsv') %>% 
+        dplyr::rename('peak.stats.filepath'=filepath) %>% 
+        select(-c(filename))
     # List all filepaths to variancePartition results after iteratively regressing out SVs
     } else if (set.name == 'SVs.variancePartition') {
         SV_VARIANCEPARTITION_RESULTS_DIR %>% 
         parse_results_filelist(suffix='SV.variance.partition.results.tsv') %>% 
         dplyr::rename('SV.variancePartition.filepath'=filepath) %>%  
-        select(-c(filename))
-    # List all CRD objects with clusters + filtered clusters + LEFs
-    } else if (set.name == 'CRD.blobs') {
-        CRD_RESULTS_DIR %>%
-        parse_results_filelist(suffix='decorate.blob.rds') %>% 
-        dplyr::rename('decorate.blob.filepath'=filepath)  %>% 
         select(-c(filename))
     # List all LEFs results extracted from blobs after iteratively regressing out SVs
     } else if (set.name == 'SVs.elbow') {
@@ -312,18 +312,19 @@ list_all_results_files_in_set <- function(
         parse_results_filelist(suffix='decorate.CRD.LEFs.tsv') %>% 
         dplyr::rename('elbow.filepath'=filepath) %>% 
         select(-c(filename))
+    # List all CRD objects with clusters + filtered clusters + LEFs
+    } else if (set.name == 'CRD.blobs') {
+        CRD_RESULTS_DIR %>%
+        parse_results_filelist(suffix='decorate.blob.rds') %>% 
+        dplyr::rename('decorate.blob.filepath'=filepath)  %>% 
+        select(-c(filename))
+    # List all CRDs results files with separate files for PeakLists and genomic positions
     } else if (set.name == 'CRDs') {
         CRD_RESULTS_DIR %>% 
-        parse_results_filelist(
-            suffix='-decorate.CRDs.tsv',
-            filename.column.name='is.decorate.filtered'
-        ) %>% 
-        dplyr::rename('clusters.filepath'=filepath)
-    } else if (set.name == 'peak.variance.stats') {
-        SV_PEAK_STATS_DIR %>% 
-        parse_results_filelist(suffix='peak.stats.with.SVs.removed.tsv') %>% 
-        dplyr::rename('peak.stats.filepath'=filepath) %>% 
-        select(-c(filename))
+        parse_results_filelist(suffix='-decorate.CRDs.tsv', filename.column.name='info') %>% 
+        separate_wider_delim(info, delim='-', names=c('is.filtered', 'format')) %>% 
+        mutate(format=glue('{format}.filepath')) %>% 
+        pivot_wider(names_from=format, values_from=filepath)
     # } else if (set.name == '') {
     } else {
         stop(glue('Invalid results set name: {set.name}'))

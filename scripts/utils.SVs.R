@@ -198,7 +198,7 @@ run_varaincePartition <- function(
             residuals.mx=peak.residuals.mx[, common.samples]
         )
     # print formula 
-    message(model.formula)
+    # message(model.formula)
     # estiamte how much each formula variable contributes to variance in each 
     # peak's abundance in the residualized matrix
     vps.df <- 

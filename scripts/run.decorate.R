@@ -6,7 +6,8 @@ source(here('scripts', 'basic.imports.R'))
 source(here('scripts', 'utils.SVs.R'))
 source(here('scripts', 'utils.decorate.R'))
 # load patient metadata
-all.sample.metadata <- load_sample_metadata()
+all.sample.metadata <- 
+    load_sample_metadata()
 
 ############################################################
 # Generate all input dataset + hyper-param combinations to test
@@ -18,8 +19,7 @@ all.input.and.parameter.combinations.df <-
     cross_join(RESIDUAL_MATRIX_SAMPLE_PARAMS_DF) %>% 
     # map files with estimated SVs to the corresponding residual matrices
     inner_join(
-        list_all_results_files_in_set(set.name='SVs') %>%
-        dplyr::rename('SVs.filepath'=filepath),
+        list_all_results_files_in_set(set.name='SVs'),
         by=
             join_by(
                 CPM.cutoff,
@@ -62,7 +62,6 @@ all.input.and.parameter.combinations.df %>%
             ),
         results_file=file.path(results_dir, 'decorate.blob.rds')
     ) %>% 
-        {.} -> tmp; tmp
     future_pmap(
         .l=.,
         .f=check_cached_results,
@@ -79,14 +78,26 @@ all.input.and.parameter.combinations.df %>%
 # Unpack the decorate results .rds files into tsvs 
 ############################################################
 plan(multisession, workers=TOTAL_CORES)
+# load all peak locations to determine CRD locations
+all.peak.locations.granges <- 
+    list_all_ATAC_coordinates_sets() %>% 
+    filter(CPM.cutoff == '3CPM') %>% 
+    pull(coords.filepath) %>% 
+    load_peak_locations()
+# for all generated CRD blobs
 list_all_results_files_in_set(set.name='CRD.blobs') %>% 
-mutate(
-    dummy=
-        future_pmap(
-            .l=.,
-            .f=unpack_decorate_blob,
-            results_fnc=unpack_decorate_blob,
-            .progress=TRUE
-        ) 
-)
+    # idk didnt work without this otherwise unneeded mutate wrapper
+    mutate(
+        dummy=
+            # unpack the elements of the blob into .tsv files than 
+            # can easily be parsed, loaded and aggregated for 
+            # different downstream analyses
+            future_pmap(
+                .l=.,
+                .f=unpack_decorate_blob,
+                results_fnc=unpack_decorate_blob,
+                all.peak.locations.granges=all.peak.locations.granges,
+                .progress=TRUE
+            ) 
+    )
 
