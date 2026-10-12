@@ -50,6 +50,29 @@ all.CRDs.df <-
     # load_all_CRD_data(force_redo=TRUE, filter_fnc=example_filter)
 
 ############################################################
+# Merge any CRDs that overlap, across meanClusterSizes
+############################################################
+# merge CRDs within each sample set across meanClustersizes
+# so any ovelrapping CRDs (> 0 bp overlapping) we take the union of all of them
+merged.CRDs.df <- 
+    all.CRDs.df %>% 
+    group_by(across(all_of(-c('meanClusterSize')))) %>% 
+all.CRDs.df
+
+############################################################
+# "Super Merge" any merged CRDs that overlap across sample subsets
+############################################################
+# So we take all the CRDs defined for the same input across all sample sets
+# i.e. AD, Control, All samples take the union of any set of overlapping CRDs
+# and keep all individual CRDs, so shared CRDs become the union across sample sets
+# and all condition-specific CRDs are retained
+
+############################################################
+# Annotate each super-merged CRD for whether its individual peaks are found 
+# only in AD CRDs, Control CRDs or shared by both
+############################################################
+
+############################################################
 # Compute summary statistics over sets of CRDs
 ############################################################
 plan(multisession, workers=TOTAL_CORES)
@@ -144,3 +167,11 @@ all.CRD.stats.df <-
     )
 
 ############################################################
+# Scratch
+############################################################
+all.CRD.stats.df
+# all.peak.differential.results.df$differential.results[[1]] %>% pull(peak.distanceToTSS) %>% summary()
+# all.peak.differential.results.df$differential.results[[1]]
+# all.peak.differential.results.df
+# all.CRDs.df
+# all.CRD.stats.df
