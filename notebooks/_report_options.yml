@@ -1,0 +1,16 @@
+author: "Siddharth Reed"
+keep-md: true
+lightbox: true
+format:
+    html:
+        embed-resources: true
+        page-layout: full
+        toc: true
+        number_sections: true
+        code-fold: true
+        smooth-scroll: true
+        fig-width: 9
+        fig-height: 5
+        theme:
+            dark: darkly
+            light: flatly

@@ -21,5 +21,7 @@ source(here('scripts', 'basic.imports.R'))
 # source(here('scripts', 'utils.decorate.R'))
 source(here('scripts', 'utils.plot.R'))
 library(variancePartition) # for canCorPairs
+plan(multisession, workers=TOTAL_CORES)
+NOTEBOOK_CACHE_DIR <- here('results', 'notebook.cache', params$cache.dir.name)
 ```
 

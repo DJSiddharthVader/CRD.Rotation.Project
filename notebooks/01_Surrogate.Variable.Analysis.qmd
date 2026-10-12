@@ -1,32 +1,18 @@
 ---
 title: Surrogate Variable Titration Analysis
-author: "Siddharth Reed"
 date: "`r Sys.Date()`"
-keep-md: true
-lightbox: true
-format:
-    html:
-        embed-resources: true
-        page-layout: full
-        toc: true
-        number_sections: true
-        code-fold: true
-        smooth-scroll: true
-        fig-width: 9
-        fig-height: 5
-        theme:
-            dark: darkly
-            light: flatly
+params:
+    cache.dir.name: "01_Surrogate.Variable.Analysis"
+metadata-files:
+  - _report_options.yml
 ---
 {{< include _imports.qmd >}}
+{{< include _load_sample_metadata.qmd >}}
 
 Set options for generating data in this notebook
 ```{r notebook opts}
-plan(multisession, workers=TOTAL_CORES)
 FORCE_REDO <- FALSE
 # FORCE_REDO <- TRUE
-NOTEBOOK_CACHE_DIR <- 
-    here('results', 'notebook.cache', '01_Surrogate.Variable.Analysis')
 factorize_columns_for_plotting <- function(df, SV.groups=1) {
     # categorize model variables for plotting
     if ('model.variable' %in% colnames(df)) {
@@ -94,14 +80,6 @@ factorize_columns_for_plotting <- function(df, SV.groups=1) {
         df
     }
 }
-```
-Load sample metadata
-```{r load_metadata}
-all.sample.metadata <- 
-    load_sample_metadata() %>%
-    order_variable_for_plotting() %>% 
-    select(all_of(c('SampleID', RELEVANT_METADATA_COLUMNS)))
-all.sample.metadata
 ```
 Load all SVs
 ```{r load_SV_data}

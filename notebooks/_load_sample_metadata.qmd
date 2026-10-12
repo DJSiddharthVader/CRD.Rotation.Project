@@ -1,0 +1,6 @@
+<!-- Load sample metadata -->
+```{r load_sample_metadata}
+all.sample.metadata <- 
+    load_sample_metadata() %>%
+    select(all_of(c('SampleID', RELEVANT_METADATA_COLUMNS)))
+```

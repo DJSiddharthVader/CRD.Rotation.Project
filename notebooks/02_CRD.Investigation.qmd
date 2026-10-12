@@ -1,60 +1,23 @@
-title: CRD Explorations 
-author: "Siddharth Reed"
-date: "`r Sys.Date()`"
-lightbox: true
-format:
-  html:
-    fig-width: 9
-    fig-height: 5
-    smooth-scroll: true
-    toc: true
-    number_sections: true
-    code-fold: true
-    theme:
-        dark: darkly
-        light: flatly
 ---
-
+title: CRD Exploration + Annotation
+date: "`r Sys.Date()`"
+params:
+    cache.dir.name: 02_CRD.Investigation
+metadata-files:
+  - _report_options.yml
+---
 {{< include _imports.qmd >}}
-
-Load sample metadata
-```{r load_metadata}
-plan(multisession, workers=TOTAL_CORES)
-NOTEBOOK_CACHE_DIR <- 
-    here('results', 'notebook.cache', '02_CRD.Investigation')
-stat.summary.fncs.list <- 
-    c(
-        'min'=min, 
-        'q05'=~ quantile(.x, probs=0.05),
-        'q25'=~ quantile(.x, probs=0.25),
-        'mean'=mean, 'med'=median, 
-        'q75'=~ quantile(.x, probs=0.75),
-        'q95'=~ quantile(.x, probs=0.95),
-        'max'=max,
-        'var'=var
-    )
-all.sample.metadata <- 
-    load_sample_metadata() %>%
-    select(all_of(c('SampleID', RELEVANT_METADATA_COLUMNS)))
+{{< include _load_sample_metadata.qmd >}}
+```{r notebook opts}
+FORCE_REDO <- FALSE
+# FORCE_REDO <- TRUE
 ```
-Load all SVs
+
+
+    c(
+    )
+```
 ```{r load_CRDs}
-all.CRDs.df <- 
-    check_cached_results(
-        results_file=here('results', 'all.SV.data.rds'),
-        # force_redo=TRUE,
-        results_fnc=
-            function() {
-                list_all_results_files_in_set(set.name='') %>% 
-                mutate(
-                    SVs.df=
-                        future_pmap(
-                            .l=list(SVs.filepath),
-                            .f=read_tsv, show_col_types=FALSE,
-                            .progress=TRUE
-                        )
-                )
-            }
     )
 ```
 
