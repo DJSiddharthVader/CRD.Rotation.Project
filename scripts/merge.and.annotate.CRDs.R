@@ -12,6 +12,18 @@ all.sample.metadata <-
 # List all generated CRD results
 ############################################################
 plan(multisession, workers=TOTAL_CORES)
+# differential OCR data
+all.peak.differential.results.df <- 
+    load_all_differential_OCR_results() %>%
+    # load_all_differential_OCR_results(force_redo=TRUE) %>%
+    filter(
+        contrast %in% 
+            c(
+                'AD_CERAD_withDLB',
+                'CDR_3levels',
+                'Braak_3levels',
+                'ApoE4count_2levels'
+            )
 CRDs.df <- 
     list_all_results_files_in_set(set.name='CRDs') %>% 
     filter(n.SVs == NUM_SVS_TO_GENERATE) %>% 
@@ -24,6 +36,13 @@ CRDs.df <-
                 .progress=TRUE
             ) 
     ) %>% 
+    nest(
+        differential.results=
+            -c(
+                CPM.cutoff, sample.strategy, residual.model,
+                contrast, contrast.levels,
+            )
+    ) %>%
     select(-c(filepath)) %>% 
         {.}; CRDs.df; CRDs.df$CRDs[[1]]
     CRDs.df %>% 

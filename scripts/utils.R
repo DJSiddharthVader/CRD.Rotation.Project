@@ -282,6 +282,93 @@ list_all_ATAC_datasets <- function(){
     )
 }
 
+load_all_differential_OCR_results <- function(...){
+    check_cached_results(
+        ...,
+        results_file=DIFFERENTIAL_OCR_TSV_FILEPATH,
+        results_fnc=
+            function() {
+                DIFFERENTIAL_OCR_RDS_FILEPATH %>%
+                readRDS() %>%
+                enframe(
+                    name='differential.model',
+                    value='model'
+                ) %>%
+                mutate(
+                    residual.model=
+                        case_when(
+                            differential.model == 'AgeModel'   ~ 'KeepDxAge',
+                            differential.model == 'NoAgeModel' ~ 'KeepDx',
+                        )
+                ) %>% 
+                unnest(model) %>% 
+                mutate(
+                    model=
+                        future_pmap(
+                            .l=list(model),
+                            .f=~ .x %>% enframe(name='contrast', value='diff.results')
+                        )
+                ) %>% 
+                unnest(model) %>% 
+                separate_wider_delim(
+                    contrast,
+                    delim='_for_',
+                    names=c('contrast.levels', 'contrast'),
+                    # cols_remove=FALSE
+                    too_few='align_end'
+                ) %>% 
+                mutate(contrast.type=ifelse(is.na(contrast.levels), 'continuous', 'discrete')) %>% 
+                unnest(diff.results) %>% 
+                dplyr::rename(
+                    'chr'=chromosome_name,
+                    "peak.start"=start_position,
+                    "peak.end"=end_position,
+                    "peak.strand"=strand,
+                    "peak.annotation"=annotation,
+                    "peak.annotation.simple"=annotationSimple,
+                    "peak.distanceToTSS"=distanceToTSS,
+                    "transcript.EnsemblID"=transcriptId,
+                    "gene.EnsemblID"=ensembl_gene_id,
+                    "gene.chr"=geneChr,
+                    "gene.start"=geneStart,
+                    "gene.end"=geneEnd,
+                    "gene.length"=geneLength,
+                    "gene.strand"=geneStrand,
+                    "gene.name"=Associated.Gene.Name,
+                    # "gene.type"=Gene.type,
+                    "description"=Description,
+                    "p.value"=P.Value,
+                    "p.adjust"=adj.P.Val
+                ) %>% 
+                mutate(peak.length=peak.end-peak.start)
+            }
+    ) %>% 
+    filter(contrast.type == 'discrete') %>% 
+    add_column(
+        CPM.cutoff='3CPM',
+        sample.strategy='All.Samples'
+    ) %>% 
+    select(
+        CPM.cutoff, sample.strategy, residual.model,
+        PeakID,
+        gene.EnsemblID, gene.name, # gene.type,
+        chr, peak.start, peak.end, peak.length,
+        # peak.strand,
+        peak.annotation,
+        peak.annotation.simple,
+        peak.distanceToTSS,
+        # description,
+        # gene.chr,
+        gene.start, gene.end, gene.length,
+        # gene.strand,
+        # AveExpr, z.std, t, B,
+        # contrast.type,
+        contrast, contrast.levels,
+        logFC,
+        p.value, p.adjust
+    )
+}
+
 ############################################################
 # Listing all results files + metadta prefedined named sets of results 
 ############################################################
@@ -332,62 +419,7 @@ list_all_results_files_in_set <- function(
 }
 
 ############################################################
-# Load differential abundance results for individual OCRs
 ############################################################
-load_differential_OCR_results <- function(...){
-    check_cached_results(
-        ...,
-        results_file=DIFFERENTIAL_OCR_RESULTS_TSV_FILEPATH,
-        results_fnc=
-            function() {
-                DIFFERENTIAL_OCR_RESULTS_RDS_FILEPATH %>%
-                readRDS() %>%
-                    {.} -> tmp; tmp
-                enframe(
-                    name='model.name',
-                    value='model'
-                ) %>%
-                mutate(contrast=pmap(.l=list(model), .f=~ .x$ALL %>% names() %>% list())) %>%
-                unnest(contrast) %>% 
-                mutate(contrast.type=ifelse(str_detect(contrast, '_for_'), 'discrete', 'continuous')) %>% 
-                separate_wider_delim(
-                    contrast,
-                    delim='_for_',
-                    names=c(NA, 'contrast.variable'),
-                    too_few='align_start',
-                    cols_remove=FALSE
-                ) %>% 
-                mutate(
-                    differential.results.df=
-                        pmap(
-                            .l=.,
-                            .f=
-                                function(model, variable.names, ...){
-                                    model$ALL[[variable.names]] %>% 
-                                    as_tibble() %>%
-                                    dplyr::rename(
-                                        'chr'=chromosome_name,
-                                        'EnsemblID'=ensembl_gene_id,
-										"peak.start"=start_position,
-										"peak.end"=end_position,
-                                        "peak.strand"=strand,
-										"peak.annotation"=annotation,
-                                        "peak.annotation.simple"=annotationSimple,
-                                        "gene.chr"=geneChr,
-										"gene.start"=geneStart,
-										"gene.end"=geneEnd,
-                                        "gene.length"=geneLength,
-										"gene.strand"=geneStrand,
-										"gene.name"=Associated.Gene.Name,
-										"p.value"=P.Value,
-                                        "p.adjust"=adj.P.Val
-
-                                    ) %>% 
-                                    mutate(peak.length=peak.end-peak.start)
-                                }
-                        )
-                )
-            }
     ) %>% 
     filter(contrast.type == 'discrete') %>% 
     add_column(sample.strategy='All.Samples') %>% 
