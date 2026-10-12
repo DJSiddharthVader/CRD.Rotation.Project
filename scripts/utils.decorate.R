@@ -89,6 +89,20 @@ subset_peak_data <- function(
     )
 }
 
+clean_decorate_param_columns <- function(df){
+    decorate.params.list <- colnames(DECORATE_HYPER_PARAMS_DF) %>% {.[. != 'meanClusterSize']}
+    {
+        if (length(setdiff(decorate.params.list, colnames(df))) == 0) {
+            df %>% 
+            mutate(decorate.params=glue(paste0('{', decorate.params.list, '}', collapse='+'))) %>% 
+            select(-all_of(decorate.params.list))
+        } else {
+            df
+        }
+    } %>% 
+    mutate(meanClusterSize=factor(meanClusterSize))
+}
+
 ############################################################
 # Generate decorate CRDs
 ############################################################
