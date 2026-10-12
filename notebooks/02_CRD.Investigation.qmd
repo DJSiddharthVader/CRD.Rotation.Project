@@ -13,18 +13,191 @@ FORCE_REDO <- FALSE
 # FORCE_REDO <- TRUE
 ```
 
+# Show that CRDs are disjoint pre/post filtering
 
+# Number of total CRDs + Peaks per Condition
+
+```{r plot_CRD_counts, results='asis'}
+#| echo: false
+#| fig-height: 4
+#| fig-width: 6
+# #| eval: false
+example_filter <- function(df){
+    df %>% 
+    # filter(sample.strategy != 'No.Others') %>% 
+    filter(CPM.cutoff == '3CPM') %>% 
+    filter(z.score.counts) %>% 
+    filter(n.SVs == NUM_SVS_TO_GENERATE) %>% 
+    filter(SVs.included == NUM_SVS_TO_REMOVE)
+    # select(-all_of(decorate.params.list)) %>% 
+    # select(-c(CPM.cutoff, z.score.counts, n.SVs, SVs.included))
+}
+
+n.CRDs.df <- 
+    load_all_CRD_data(filter_fnc=example_filter) %>% 
+    mutate(
+        n.CRDs=
+            future_pmap(
+                .l=list(CRDs),
+                .f=
+                    ~ .x %>% 
+                    mutate(n.peaks=pmap_int(.l=list(PeakList), .f=nrow)) %>% 
+                    summarize(
+                        .groups='drop',
+                        n.CRDs=n(),
+                        n.Peaks=sum(n.peaks)
+                    ),
+                .progress=TRUE
+            )
+    ) %>% 
+    select(-c(CRDs)) %>% 
+    unnest(n.CRDs)
+nesting.vars <- 
     c(
+        'CPM.cutoff',
+        'residual.model'
+        # 'AD.definition.column',
+    )
+n.CRDs.df %>% 
+    pivot_longer(
+        c(n.Peaks, n.CRDs),
+        names_to='metric',
+        values_to='n'
+    ) %>% 
+    order_variable_for_plotting() %>% 
+    nest(plot.df=-all_of(nesting.vars)) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_barplot,
+                x.var='is.filtered',
+                y.var='n',
+                y.scale.mode='m',
+                fill.var='sample.strategy',
+                facet.col='meanClusterSize',
+                facet.row='metric',
+                # scales='free_y', independent='y',
+                scales='free_y', independent=FALSE,
+                y.axis.label.accuracy=0.1,
+                axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+                axis.title=element_blank(),
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=2,
+        output_var='figures',
+        tabset_vars=nesting.vars
     )
 ```
-```{r load_CRDs}
+
+# Compare CRD features across subsets, before and after decorate filtering + collapsing
+
+```{r load_CRD_stats}
+all.CRD.stats.df <- 
+    ALL_CRD_STATS_TSV_FILEPATH %>%
+    read_tsv(show_col_types=FALSE) %>% 
+    filter(
+        CRD.feature %in% 
+            c(
+                'CRD.length',              
+                'CRD.nPeaks',              
+                # 'mean-logFC',              
+                'med-logFC',               
+                # 'var-logFC',               
+                # 'total-logFC',             
+                'mean-log10.p.adjust',     
+                # 'med-log10.p.adjust',      
+                # 'var-log10.p.adjust',      
+                'total-log10.p.adjust',    
+                'mean-peak.length',        
+                # 'med-peak.length',         
+                # 'var-peak.length',         
+                'total-peak.length',       
+                # 'mean-peak.distanceToTSS', 
+                # 'med-peak.distanceToTSS',  
+                # 'total-peak.distanceToTSS',
+                'mean-gene.length'
+            )
+    ) %>% 
+    mutate(meanClusterSize=factor(meanClusterSize)) %>% 
+    mutate( 
+        feature.type=   
+            case_when(  
+                # str_detect(CRD.feature, 'length|distance') ~ 'length',
+                str_detect(CRD.feature, 'length') ~ 'length',
+                CRD.feature == 'CRD.nPeaks' ~ 'nPeaks',
+                TRUE ~ 'differential'
+            )
+    )
+# all.CRD.stats.df %>% count(feature.type)
+```
+
+```{r plot_CRD_stat_distributions, results='asis'}
+#| echo: false
+#| fig-height: 6
+#| fig-width: 10
+# #| eval: false
+
+# Now plot correlation of SVs across datasets
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model',
+        # 'AD.definition.column',
+        'contrast',
+        'feature.type'
+    )
+all.CRD.stats.df %>% 
+    order_variable_for_plotting() %>% 
+    nest(plot.df=-all_of(nesting.vars)) %>% 
+    left_join(
+        tribble(
+            ~ feature.type, ~ x.scale.mode, ~ x.axis.label.accuracy,
+            'length',       'mb',           0.1,
+            'nPeaks',       'm',            0.1,
+            'differential', '',             0.01,
+        ),
+        by='feature.type'
+    ) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_boxplot,
+                x.var='CRD.value',
+                y.var='meanClusterSize',
+                fill.var='sample.strategy',
+                facet.row='is.filtered',
+                facet.col='CRD.feature', 
+                y.scale.mode='discrete',
+                scales='free_x',
+                # space='free',
+                # independent='all',
+                legend.position='top',
+                axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+                axis.title=element_blank(),
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=2,
+        output_var='figures',
+        tabset_vars=nesting.vars
     )
 ```
 
-# Compare CRD features across subsets
+# Plot effects of merging across meanClusterSizes + Sample Sets
 
-# Compare effects of filtering/collapsing CRDs 
+```{r load}
+```
 
-# Compare differential OCRs across CRDs across conditions
+```{r plot, results='asis'}
+#| echo: false
+#| fig-width: 6
+#| fig-height: 4
+```
 
-# Define AD/Control-specific CRDs and stratify plots by them
+# Define AD/Control-specific CRDs and plot features
+
