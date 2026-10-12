@@ -483,27 +483,40 @@ list_all_results_files_in_set <- function(
 }
 
 ############################################################
+# Load all CRDs, specified as CRDID <-> PeakID mappings
 ############################################################
+load_all_CRDs_as_Peak_lists <- function() {
+    decorate.params.list <- DECORATE_HYPER_PARAMS_DF %>% colnames() %>% {.[. != 'meanClusterSize']}
+    list_all_results_files_in_set(set.name='CRD.PeakLists') %>% 
+    # only load CRDs with chosen SVs regressed out 
+    # filter(CPM.cutoff == '3CPM') %>% 
+    # filter(z.score.counts) %>% 
+    # filter(n.SVs == NUM_SVS_TO_GENERATE) %>% 
+    # filter(SVs.included == NUM_SVS_TO_REMOVE) %>% 
+    # filter(sample.strategy != 'No.Others') %>% 
+    mutate(decorate.params=glue(paste0('{', decorate.params.list, '}', collapse='+'))) %>% 
+    mutate(
+        CRDs=
+            future_pmap(
+                .l=list(CRDs.filepath),
+                .f=~ read_tsv(.x, show_col_types=FALSE),
+                .progress=TRUE
+            )
+    ) %>%
+    unnest(CRDs) %>%
+    nest(CRDs=c(chr, PeakID, CRDID)) %>% 
+    arrange(
+        CPM.cutoff,
+        residual.model,
+        decorate.params, meanClusterSize,
+        AD.definition.column, sample.strategy,
+        is.decorate.filtered
     ) %>% 
-    filter(contrast.type == 'discrete') %>% 
-    add_column(sample.strategy='All.Samples') %>% 
     select(
-        PeakID,
-        EnsemblID, gene.name,
-        chr, 
-        peak.start,
-        peak.end,
-        # peak.strand,
-        peak.annotation,
-        peak.annotation.simple,
-        # gene.chr,
-        gene.start,
-        gene.end,
-        # gene.length,
-        # gene.strand,
-        # AveExpr, z.std, t,
-        logFC,
-        p.value, p.adjust
+        CPM.cutoff, residual.model, AD.definition.column, sample.strategy,
+        z.score.counts, n.SVs, SVs.included,
+        decorate.params, meanClusterSize, is.decorate.filtered,
+        CRDs
     )
 }
 
