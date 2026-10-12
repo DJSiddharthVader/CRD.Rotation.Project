@@ -56,10 +56,7 @@ subset_peak_data <- function(
     # load coordinates of all ATAC features
     peak.locations.gr <- 
         coords.filepath %>% 
-        readRDS() %>% 
-        {.$genes} %>% 
-        as.data.frame() %>% 
-        makeGRangesFromDataFrame()
+        load_peak_locations()
         # select(seqnames, start, end)
     # load residual ATAC matrix
     peak.residuals.mx <- 

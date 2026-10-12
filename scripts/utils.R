@@ -272,6 +272,14 @@ list_all_ATAC_coordinates_sets <- function(){
     select(-c(dims))
 }
 
+load_peak_locations <- function(coords.filepath, ...) {
+    coords.filepath %>% 
+    readRDS() %>% 
+    {.$genes} %>% 
+    as.data.frame() %>% 
+    makeGRangesFromDataFrame()
+}
+
 list_all_ATAC_datasets <- function(){
     # First list residual ATAC-seq count matrices that can be used to annotate CRDs
     list_all_ATAC_residual_sets() %>% 
@@ -279,6 +287,62 @@ list_all_ATAC_datasets <- function(){
     left_join(
         list_all_ATAC_coordinates_sets(),
         by=join_by(CPM.cutoff)
+    )
+}
+
+load_all_peak_metadata <- function(
+    CPM.cutoff='3CPM',
+    ...){
+    check_cached_results(
+        ...,
+        results_file=PEAK_METADATA_TSV_FILEPATH,
+        results_fnc=
+            function(CPM.cutoff) {
+                list_all_ATAC_coordinates_sets() %>% 
+                mutate(
+                    peaks=
+                        future_pmap(
+                            .l=list(coords.filepath),
+                            .f= ~ .x %>% readRDS() %>% {.$genes} %>% as_tibble(),
+                            .progres=TRUE
+                        )
+                ) %>%
+                unnest(peaks) %>% 
+                mutate(peak.length=end-start) %>% 
+                dplyr::rename(
+                    'chr'=seqnames,
+                    "peak.start"=start,
+                    "peak.end"=end,
+                    "peak.strand"=strand,
+                    "peak.distanceToTSS"=distanceToTSS,
+                    "peak.annotation"=annotation,
+                    "peak.annotation.simple"=annotationSimple,
+                    'gene.EnsemblID'=geneId,
+                    'transcript.EnsemblID'=transcriptId,
+                    "gene.name"=Associated.Gene.Name,
+                    # "gene.chr"=geneChr,
+                    "gene.start"=geneStart,
+                    "gene.end"=geneEnd,
+                    "gene.length"=geneLength,
+                    "gene.strand"=geneStrand,
+                    'gene.type'=Gene.type,
+                    'description'=Description
+                )
+            }
+    ) %>% 
+    filter(CPM.cutoff == CPM.cutoff) %>% 
+    select(
+        PeakID,
+        gene.EnsemblID, gene.name, 
+        # transcript.EnsemblID,
+        chr, peak.start, peak.end, peak.length,
+        # peak.strand,
+        peak.annotation, peak.annotation.simple,
+        peak.distanceToTSS,
+        # gene.chr,
+        gene.start, gene.end, gene.length,
+        # gene.strand,
+        gene.type
     )
 }
 
