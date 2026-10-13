@@ -103,7 +103,7 @@ clean_decorate_param_columns <- function(df){
 ############################################################
 # Generate decorate CRDs
 ############################################################
-tidy_CRD_scores <- function(scores.obj){
+tidy_CRD_scores <- function(scores.obj, ...){
     scores.obj %>% 
     enframe(
         name='meanClusterSize',
@@ -113,7 +113,7 @@ tidy_CRD_scores <- function(scores.obj){
     as_tibble() # %>% select(-c(id))
 }
 
-tidy_CRD_clusters <- function(clusters.obj) {
+tidy_CRD_clusters <- function(clusters.obj, ...) {
     # every row is assignment for a single peak to a CRD
     # columns: meanClusterSize, chr, PeakID, CRDID
     clusters.obj %>%
@@ -325,34 +325,98 @@ unpack_decorate_blob <- function(
     # decorate.blob.filepath=tmp$decorate.blob.filepath[[1]];
     results_dir <- dirname(decorate.blob.filepath)
     decorate.blob <- readRDS(decorate.blob.filepath)
-    # peak <-> CRD (cluster) mapping
-    decorate.blob$all.clusters %>%
-        tidy_CRD_clusters() %>%
-        write_tsv(file.path(results_dir, 'all-PeakList-decorate.CRDs.tsv'))
-    # CRDs decinfed by their genomic coordinates
-    decorate.blob$all.clusters %>%
-        convert_PeakList_to_Locations(all.peak.locations.granges) %>% 
-        write_tsv(file.path(results_dir, 'all-Locations-decorate.CRDs.tsv'))
-    # CRD self-correlation stats 
-    decorate.blob$all.LEFs %>%
-        tidy_CRD_scores() %>%
-        write_tsv(file.path(results_dir, 'all-decorate.CRD.LEFs.tsv'))
-    # post filtering+collapsing by decorate
-    decorate.blob$filtered.clusters %>%
-        tidy_CRD_clusters() %>%
-        write_tsv(file.path(results_dir, 'filtered-PeakList-decorate.CRDs.tsv'))
-    # CRDs decinfed by their genomic coordinates
-    decorate.blob$filtered.clusters %>%
-        convert_PeakList_to_Locations(all.peak.locations.granges) %>% 
-        write_tsv(file.path(results_dir, 'filtered-Locations-decorate.CRDs.tsv'))
-    # stats for filtered CRDs
-    decorate.blob$filtered.LEFs %>%
-        tidy_CRD_scores() %>%
-        write_tsv(file.path(results_dir, 'filtered-decorate.CRD.LEFs.tsv'))
+    blobs.df <- 
+        tribble(
+            ~is.decorate.filtered, ~CRDs.blob,
+            'all',                 decorate.blob$all.clusters,
+            'filtered',            decorate.blob$filtered.clusters,
+        )
+    ##################################################################
+    # Save mapping of individual PeakIDs <-> CRDIDs to a file 
+    blobs.df %>% 
+    mutate(
+        CRDs=
+            future_pmap(
+                .l=list(CRDs.blob),
+                .f=~ tidy_CRD_clusters(.x) %>% mutate(ClusterID=as.character(ClusterID))
+            )
+    ) %>% 
+    select(-c(CRDs.blob)) %>% 
+    unnest(CRDs) %>% 
+    nest(CRDs=-c(meanClusterSize, is.decorate.filtered)) %>% 
+    # now for each level of filtering, format and meanCluster size, save those CRDs as a single file
+    mutate(
+        results_file=
+            file.path(
+                results_dir,
+                glue('meanClusterSize_{meanClusterSize}'),
+                glue('is.decorate.filtered_{is.decorate.filtered}'),
+                'PeakList-decorate.CRDs.tsv'
+            )
+    ) %>% 
+    future_pmap(
+        .l=.,
+        .f=
+            function(results_file, CRDs, ...){
+                dir.create(dirname(results_file), recursive=TRUE, showWarnings=FALSE)
+                CRDs %>% write_tsv(results_file)
+            }
+    )
+    ##################################################################
+    # Save genomic coordinates for each set of CRDs to a file
+    blobs.df %>% 
+    mutate(
+        CRDs=
+            future_pmap(
+                .l=list(CRDs.blob),
+                .f=
+                    ~ .x %>%
+                    convert_PeakList_to_Locations(all.peak.locations.granges) %>% 
+                    mutate(ClusterID=as.character(ClusterID))
+            )
+    ) %>% 
+    select(-c(CRDs.blob)) %>% 
+    unnest(CRDs) %>% 
+    nest(CRDs=-c(meanClusterSize, is.decorate.filtered)) %>% 
+    # now for each level of filtering, format and meanCluster size, save those CRDs as a single file
+    mutate(
+        results_file=
+            file.path(
+                results_dir,
+                glue('meanClusterSize_{meanClusterSize}'),
+                glue('is.decorate.filtered_{is.decorate.filtered}'),
+                'Locations-decorate.CRDs.tsv'
+            )
+    ) %>% 
+    future_pmap(
+        .l=.,
+        .f=
+            function(results_file, CRDs, ...){
+                dir.create(dirname(results_file), recursive=TRUE, showWarnings=FALSE)
+                CRDs %>% write_tsv(results_file)
+            }
+    )
+    ##################################################################
+    # Save all CRD self-correlation stats summary stats as text files
+    decorate.blob$cluster.LEFs %>%
+    nest(CRDs=-c(meanClusterSize)) %>% 
+    mutate(
+        results_file=
+            file.path(
+                results_dir,
+                glue('meanClusterSize_{meanClusterSize}'),
+                'decorate.CRDs.LEFs.tsv'
+            )
+    ) %>% 
+    future_pmap(
+        .l=.,
+        .f=
+            function(results_file, CRDs, ...){
+                dir.create(dirname(results_file), recursive=TRUE, showWarnings=FALSE)
+                CRDs %>% write_tsv(results_file)
+            }
+    )
     invisible(NULL)
-    # decorate.blob$tree.list %>%
-    #     tidy_decorate_tree.list() %>% 
-    #     write_tsv(file.path(results_dir, 'decorate.tree.list.tsv'))
 }
 
 ############################################################

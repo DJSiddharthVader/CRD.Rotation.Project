@@ -473,7 +473,7 @@ list_all_results_files_in_set <- function(
     } else if (set.name == 'CRDs') {
         CRD_RESULTS_DIR %>% 
         parse_results_filelist(suffix='-decorate.CRDs.tsv', filename.column.name='info') %>% 
-        separate_wider_delim(info, delim='-', names=c('is.filtered', 'format')) %>% 
+        separate_wider_delim(info, delim='-', names=c('format')) %>% 
         mutate(format=glue('{format}.filepath')) %>% 
         pivot_wider(names_from=format, values_from=filepath)
     # } else if (set.name == '') {

@@ -84,20 +84,14 @@ all.peak.locations.granges <-
     filter(CPM.cutoff == '3CPM') %>% 
     pull(coords.filepath) %>% 
     load_peak_locations()
-# for all generated CRD blobs
+# for all CRD blobs unpack the elements of the blob into .tsv files than can easily 
 list_all_results_files_in_set(set.name='CRD.blobs') %>% 
-    # idk didnt work without this otherwise unneeded mutate wrapper
-    mutate(
-        dummy=
-            # unpack the elements of the blob into .tsv files than 
-            # can easily be parsed, loaded and aggregated for 
-            # different downstream analyses
-            future_pmap(
-                .l=.,
-                .f=unpack_decorate_blob,
-                results_fnc=unpack_decorate_blob,
-                all.peak.locations.granges=all.peak.locations.granges,
-                .progress=TRUE
-            ) 
-    )
+    # be parsed, loaded and aggregated for different downstream analyses
+    future_pmap(
+        .l=.,
+        .f=unpack_decorate_blob,
+        results_fnc=unpack_decorate_blob,
+        all.peak.locations.granges=all.peak.locations.granges,
+        .progress=TRUE
+    ) 
 
