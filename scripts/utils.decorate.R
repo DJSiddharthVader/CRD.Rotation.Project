@@ -3,6 +3,7 @@
 ############################################################
 suppressPackageStartupMessages({
     library(GenomicRanges)
+    library(plyranges)
     library(decorate)
     library(limma)
     source(here('scripts', 'utils.SVs.R'))
@@ -485,20 +486,31 @@ load_all_CRD_data <- function(
 }
 
 merge_overlapping_CRDs <- function(
-    CRDs,
-    all.peak.metadata.df,
+    CRDs.to.merge,
+    merging_column,
     ...){
-    # row.index=1; CRDs=all.CRDs.df$CRDs[[row.index]];
-    CRDs %>% 
+    dedup_and_sort <- function(input.vector) {
+        input.vector %>% 
+        unlist() %>% 
+        c() %>% 
+        unique() %>% 
+        paste0(collapse='+')
+    }
+    CRDs.to.merge %>% 
+    unnest(CRDs) %>% 
     as_granges() %>% 
-    # reduce_ranges()
+    # For each set of CRDs being merged, als
+    # keep the list of all constituent CRDIDs and indivudal PeakIDs
     reduce_ranges(
-        chr=unique(chr),
-        ClusterIDs=list(c(ClusterID)),
-        CRDIDs=list(c(CRDID)),
-        PeakList=list(c(PeakList))
+        chr=unique(chr)[[1]],
+        PeakList=dedup_and_sort(PeakList),
+        CRDIDs=dedup_and_sort(CRDID),
+        # detected.meanClusterSizes=dedup_and_sort(meanClusterSize)
+        # detected.groups=dedup_and_sort(!!sym(merging_column)),
+        !!sym(glue('detected.{merging_column}')) := dedup_and_sort(!!sym(merging_column))
     ) %>% 
-        {.}
+    as_tibble() # %>% dplyr::rename(glue('detected.{merging_column}')=detected.groups)
+    # dplyr::rename(!!sym(glue('detected.{merging_column}')) = detected.groups)
 }
 
 compute_frequency <- function(vector, category.name){
