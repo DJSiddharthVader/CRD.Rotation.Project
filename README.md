@@ -1,42 +1,39 @@
 # Chromatin alterations of cis-regulatory domains in human microglia in Alzheimer’s disease
 
-[Project Proposal](https://docs.google.com/document/d/14lGdC1wouelZSBIiexuzfM_xTdoa0PFkcUsDgmrrtlI/edit?tab=t.yje1p2c6e8i#heading=h.neg6n6u2fk6i)
+- [Project Proposal](https://docs.google.com/document/d/14lGdC1wouelZSBIiexuzfM_xTdoa0PFkcUsDgmrrtlI/edit?tab=t.yje1p2c6e8i#heading=h.neg6n6u2fk6i)
+- [Project Slides](https://docs.google.com/presentation/d/1DeebPCTVOYL7_xXkz5jO_dYZ5dXAhq5-tiSk8S1OhLw/edit?slide=id.h2c3801deca726a03_0_38#slide=id.h2c3801deca726a03_0_38)
 
 Roussos Lab Fall 2026 Rotation Project
+
+## Results
+
+Here are all the compiled quarto notebooks detailing my results
+
+1. [SV Results](./compiled.notebooks/01_Surrogate.Variable.Analysis.html)
+1. [CRD Merging + Annotation](./compiled.notebooks/02_CRD.Investigation.html)
+1. [Differential CRDs](./compiled.notebooks/03_Differential.CRD.Analysis.html)
+1. [CRD Functional Enricment](./compiled.notebooks/04_CRD.Functional.Enrichment.Analysis.html)
+1. [GWAS Results](./compiled.notebooks/05_GWAS.Analysis.html)
+1. [CRD + GWAS + Functional Integration](./compiled.notebooks/06_CRD.GWAS.Integration.html)
 
 ## Reproducibility
 
 I manage R dependencies with [rv](https://a2-ai.github.io/rv-docs/), I have included the `rv.lock` and `rproject.toml` here to list dependencies and allow for easy install.
 ```bash
-rv sync  # install all dependencies specified in the .toml file
+$ rv sync  # install all dependencies specified in the .toml file
+```
+Run scripts to generate results
+```bash
+# Generate SVs and variancePartition() analysis of SVs
+$ Rscript ./scripts/generate.SV.results.R
+# Generate CRDs with SVs various regressed out
+$ Rscript ./scripts/run.decorate.R
+# Load CRDs, merge CRDs across meanClusterSizes + sample sets 
+# Also annotated whether CRDs are AD/Control-specific or not
+$ Rscript ./scripts/merge.and.annotate.CRDs.R
+```
+Compile quarto notebooks
+```bash
+$ find notebooks/*.qmd -type f -exec quarto render {} --to html \;
 ```
 
-## TODO
-
-- [x] Subset samples of peak residuals for downstream analyses
-  - AD Only, Controls Only, No Others, All Samples
-- [x] correlation of SVs estimated on different sample sets
-  - Controls vs All on Control samples
-  - AD vs All on AD samples
-- [x] Generate SVs from peak residuals
-- [ ] compare SV correlations across n.SVs i.e. same  matrix + CPM + sample set 
-  - merge all SVs into a single matrix w/ n.SV_SV{1-N} for mega heatmap
-    - or just do free space facets?
-- [x] Compare SV ~ metadata correlations
-  - All SVs vs AD Phenotypes + Age + Covariates
-  - use `canCorPairs()` 
-- [x] Implement code to residualize a set of SVs out of the peak residuals matrix
-- [ ] SV varianceParrition analysis
-  - [ ] get feature variances before residualizing SVs
-  - [ ] get feature variances after residualizing SVs
-  - [ ] compute pre/post SV-residualizing variance difference per feature
-  - [ ] plot SV variances 
-- [ ] Compare how LEF changes when including different numbers of SVs
-  - Elbow plot of LEF vs #SVs included
-  - for each number of SVs generated (n.SV), test incrementally adding SVs to the residualization
-    - i.e. elbow plot for each n.SV + all other residual/SV sample sets
-    - use different summary stats of LEFs across clusters per re-residualized matrix
-- [ ] Compare cluster features as well
-  - [ ] number of clusters
-  - [ ] size distribution
-  - [ ] LEF distribution
