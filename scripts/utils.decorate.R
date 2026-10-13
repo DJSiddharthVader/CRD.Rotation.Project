@@ -564,3 +564,136 @@ compute_CRD_stats <- function(
     )
 }
 
+############################################################
+# Post-process CRDs (merge + annotate)
+############################################################
+combine_CRD_Locations_and_PeakLists <- function(
+    PeakList.filepath,
+    Locations.filepath,
+    ...){
+    inner_join(
+        PeakList.filepath %>% 
+            read_tsv(show_col_types=FALSE) %>% 
+            nest(PeakList=c(PeakID)),
+        Locations.filepath %>% 
+            read_tsv(show_col_types=FALSE),
+        by=
+            join_by(
+                meanClusterSize, 
+                chr,
+                ClusterID,
+                CRDID
+            )
+    ) %>%
+    nest(CRDs=-c(meanClusterSize))
+}
+
+load_all_CRD_data <- function(
+    filter_fnc=NULL,
+    ...){
+    # List all sets of CRDs estimated
+    check_cached_results(
+        results_file=ALL_CRD_PEAKLISTS_AND_LOCATIONS_FILEPATH,
+        ...,
+        filter_fnc=filter_fnc,
+        results_fnc=
+            function(filter_fnc, ...) {
+                list_all_results_files_in_set(set.name='CRDs') %>%
+                {
+                    if (!is.null(filter_fnc)) {
+                        filter_fnc(.)
+                    } else {
+                        .
+                    }
+                } %>% 
+                # Load PeakLists and coordinates separately and 
+                # then map together for downstream analysis (1 CRD per row)
+                mutate(
+                    CRDs=
+                        future_pmap(
+                            .l=.,
+                            .f=combine_CRD_Locations_and_PeakLists,
+                            .progress=TRUE
+                        )
+                ) %>% 
+                unnest(CRDs)
+            }
+    ) %>% 
+    clean_decorate_param_columns() %>% 
+    # clean up columns
+    select(
+        CPM.cutoff, residual.model, AD.definition.column, sample.strategy,
+        z.score.counts, n.SVs, SVs.included,
+        decorate.params, meanClusterSize, is.filtered,
+        CRDs
+    )
+}
+
+merge_overlapping_CRDs <- function(
+    CRDs,
+    all.peak.metadata.df,
+    ...){
+    # row.index=1; CRDs=all.CRDs.df$CRDs[[row.index]];
+    CRDs %>% 
+    as_granges() %>% 
+    # reduce_ranges()
+    reduce_ranges(
+        chr=unique(chr),
+        ClusterIDs=list(c(ClusterID)),
+        CRDIDs=list(c(CRDID)),
+        PeakList=list(c(PeakList))
+    ) %>% 
+        {.}
+}
+
+compute_frequency <- function(vector, category.name){
+    tibble(category=vector) %>%
+    count(category) %>% 
+    mutate(category=glue('{category.name}-{category}')) %>% 
+    muatate(freq=n / n()) %>% 
+    list()
+}
+
+compute_CRD_stats <- function(
+    CRDs,
+    differential.results,
+    ...){
+    CRDs %>% 
+    unnest(PeakList) %>%
+    left_join(
+        differential.results,
+        # copy=TRUE,
+        by=
+            join_by(
+                chr,
+                PeakID
+            )
+    ) %>% 
+    mutate(log10.p.adjust=-log10(p.adjust)) %>% 
+    group_by(CRDID) %>%
+    summarize(
+        CRD.length=unique(width),
+        CRD.nPeaks=n(),
+        # peak.type.freqs=compute_frequency(peak.type, 'peak.type'),
+        # gene.type.freqs=compute_frequency(gene.type, 'gene.type'),
+        across(
+            .cols=
+                c(
+                    logFC,
+                    log10.p.adjust,
+                    peak.length,
+                    peak.distanceToTSS,
+                    gene.length
+                ),
+            .names='{.fn}-{.col}',
+            .fns=STAT_SUMMARY_FNCS_LIST
+        )
+    ) %>% 
+    unnest(ends_with('.freqs')) %>% 
+    pivot_longer(
+        -c(CRDID),
+        names_to='CRD.feature',
+        values_to='CRD.value',
+    )
+}
+
