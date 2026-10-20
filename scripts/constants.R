@@ -54,10 +54,45 @@ ALL_VARIABLE_ORDERINGS <-
             ),
         sample.strategy=
             c(
+                'merged',
                 'All.Samples',
                 'AD.Samples',
                 'Control.Samples',
                 'No.Others'
+            ),
+        meanClusterSize=
+            c(
+                'merged',
+                '100',
+                '80',
+                '50',
+                '25',
+                '10'
+            ),
+        detected.in.groups=
+            c(
+                "10",
+                "10+25",                                 
+                "10+25+50",                             
+                "10+25+50+80",                          
+                "10+25+50+80+100",                      
+                "10+50",                                
+                "10+80",                                
+                "10+100",                               
+                "10+25+80",                             
+                "10+50+80",                             
+                "10+25+100",                            
+                "10+50+100",                            
+                "10+80+100",                            
+                "10+25+50+100",                         
+                "10+25+80+100",                         
+                "AD.Samples",                           
+                "Control.Samples",                      
+                "All.Samples",                          
+                "AD.Samples+All.Samples+Control.Samples",
+                "AD.Samples+All.Samples",               
+                "All.Samples+Control.Samples",          
+                "AD.Samples+Control.Samples"
             )
     )
 

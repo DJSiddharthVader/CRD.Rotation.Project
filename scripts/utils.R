@@ -482,6 +482,15 @@ list_all_results_files_in_set <- function(
         parse_results_filelist(suffix='-decorate.CRDs.tsv', filename.column.name='format') %>% 
         mutate(format=glue('{format}.filepath')) %>% 
         pivot_wider(names_from=format, values_from=filepath)
+    } else if (set.name == 'merged.CRDs') {
+        MERGED_CRD_RESULTS_DIR %>% 
+        parse_results_filelist(suffix='-decorate.CRDs.tsv', filename.column.name='format') %>% 
+        mutate(format=glue('{format}.filepath')) %>% 
+        pivot_wider(names_from=format, values_from=filepath)
+    } else if (set.name == 'CRD.stats') {
+        MERGED_CRD_RESULTS_DIR %>% 
+        parse_results_filelist(suffix='CRD.stats.tsv', filename.column.name='filename') %>% 
+        select(-c(filename))
     # } else if (set.name == '') {
     } else {
         stop(glue('Invalid results set name: {set.name}'))

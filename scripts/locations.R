@@ -7,6 +7,7 @@ SVA_RESULTS_DIR                  <- here("results", "peak.SVs")
 SV_VARIANCEPARTITION_RESULTS_DIR <- here("results", "SV.variancePartitions")
 SV_PEAK_STATS_DIR                <- here("results", "SV.peak.stats")
 CRD_RESULTS_DIR                  <- here("results", "decorate.CRDs")
+MERGED_CRD_RESULTS_DIR           <- here("results", "merged.CRDs")
 
 #############################
 # Input data
