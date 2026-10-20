@@ -128,6 +128,20 @@ DECORATE_HYPER_PARAMS_DF <-
         filterMetricCutoff=c(0.15),
         jaccardCutoff=c(0.9)
     )
+DIFFERENTIAL_DECORATE_HYPER_PARAMS_DF <- 
+    tribble(
+        ~contrast.variable, ~contrast.denominator,  ~contrast.numerator,
+        'AD_CERAD_withDLB', 'Control',              'AD', 
+        'Braak_3levels',    'Braak_Max2',           'Braak_3to4',
+        'Braak_3levels',    'Braak_3to4',           'Braak_5plus',
+        'Braak_3levels',    'Braak_Max2',           'Braak_5plus',
+        'CDR_3levels',      'Healthy',              'MCI',
+        'CDR_3levels',      'Healthy',              'Dementia',
+        'CDR_3levels',      'MCI',                  'Dementia',
+        'Sex',              'Female',               'Male',
+        'Biobank',          'MSBB',                 'Rush',
+    ) %>% 
+    mutate(contrast=glue('{contrast.variable}-{contrast.numerator}-{contrast.denominator}'))
 
 ############################################################
 # Common functions/summary stats

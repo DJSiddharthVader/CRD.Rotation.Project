@@ -491,6 +491,13 @@ list_all_results_files_in_set <- function(
         MERGED_CRD_RESULTS_DIR %>% 
         parse_results_filelist(suffix='CRD.stats.tsv', filename.column.name='filename') %>% 
         select(-c(filename))
+    } else if (set.name == 'CRD.differential.stats') {
+        DIFFERENTIAL_CRD_RESULTS_DIR %>% 
+        parse_results_filelist(
+            suffix='differential.CRD.results.tsv',
+            filename.column.name='filename'
+        ) %>% 
+        select(-c(filename))
     # } else if (set.name == '') {
     } else {
         stop(glue('Invalid results set name: {set.name}'))
