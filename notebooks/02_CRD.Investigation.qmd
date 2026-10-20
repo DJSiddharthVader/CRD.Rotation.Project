@@ -6,31 +6,18 @@ params:
 metadata-files:
   - _report_options.yml
 ---
+
 {{< include _imports.qmd >}}
 {{< include _load_sample_metadata.qmd >}}
 ```{r notebook opts}
 FORCE_REDO <- FALSE
 # FORCE_REDO <- TRUE
-```
-
-# Show that CRDs are disjoint pre/post filtering
-
-# Number of total CRDs + Peaks per Condition
-
-```{r plot_CRD_counts, results='asis'}
-#| echo: false
-#| fig-height: 4
-#| fig-width: 6
-# #| eval: false
-example_filter <- function(df){
+results_filter_fnc <- function(df) {
     df %>% 
-    # filter(sample.strategy != 'No.Others') %>% 
     filter(CPM.cutoff == '3CPM') %>% 
     filter(z.score.counts) %>% 
     filter(n.SVs == NUM_SVS_TO_GENERATE) %>% 
     filter(SVs.included == NUM_SVS_TO_REMOVE)
-    # select(-all_of(decorate.params.list)) %>% 
-    # select(-c(CPM.cutoff, z.score.counts, n.SVs, SVs.included))
 }
 
 n.CRDs.df <- 

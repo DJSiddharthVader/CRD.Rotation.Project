@@ -264,12 +264,3 @@ all.CRD.stats.df <-
         }
     )
 
-############################################################
-# Scratch
-############################################################
-all.CRD.stats.df
-# all.peak.differential.results.df$differential.results[[1]] %>% pull(peak.distanceToTSS) %>% summary()
-# all.peak.differential.results.df$differential.results[[1]]
-# all.peak.differential.results.df
-# all.CRDs.df
-# all.CRD.stats.df

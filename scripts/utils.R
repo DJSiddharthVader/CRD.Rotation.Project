@@ -330,8 +330,15 @@ load_all_peak_metadata <- function(
                 )
             }
     ) %>% 
-    filter(CPM.cutoff == CPM.cutoff) %>% 
+    {
+        if (!is.null(CPM.cutoff)) {
+            filter(., CPM.cutoff == CPM.cutoff)
+        } else {
+            .
+        }
+    } %>% 
     select(
+        CPM.cutoff,
         PeakID,
         gene.EnsemblID, gene.name, 
         # transcript.EnsemblID,

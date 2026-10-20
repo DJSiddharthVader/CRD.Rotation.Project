@@ -24,7 +24,9 @@ select_sample_subset <- function(
     # AD.definition.column='AD_CERAD_withDLB'; sample.strategy='Make.Error'
     # decide which specific samples to select  based on inclusin criteria
     filter_cmd <- 
-        if        (AD.definition.column == 'AD_CERAD_withDLB' & sample.strategy == 'Control.Samples') {
+        if (sample.strategy == 'All.Samples') {
+            . %>% filter(!is.na(!!sym(AD.definition.column)))
+        } else if (AD.definition.column == 'AD_CERAD_withDLB' & sample.strategy == 'Control.Samples') {
             .  %>% dplyr::filter(!!sym(AD.definition.column) == 'Control')
         } else if (AD.definition.column == 'AD_CERAD_withDLB' & sample.strategy == 'AD.Samples') {
             .  %>% dplyr::filter(!!sym(AD.definition.column) == 'AD')
@@ -36,8 +38,6 @@ select_sample_subset <- function(
             .  %>% dplyr::filter(!!sym(AD.definition.column) == 'Braak5plus')
         } else if (AD.definition.column == 'Bradk_3levels' & sample.strategy == 'No.Others') {
             .  %>% dplyr::filter(!!sym(AD.definition.column) != 'BraakMax2')
-        } else if (sample.strategy == 'All.Samples') {
-            . %>% filter(!is.na(!!sym(AD.definition.column)))
         } else {
             stop(glue('sample inclusion criteria not implemented. you used {sample.strategy} to filter on the column {AD.definition.column}'))
         }
@@ -77,9 +77,6 @@ subset_peak_data <- function(
             sample.strategy=sample.strategy
         )
     # Now make sure rows are compatible
-    # length(samples.to.keep); length(peaks.to.keep)
-    # peak.locations.gr <- peak.locations.gr[peaks.to.keep, ]
-    # peak.residuals.mx <- peak.residuals.mx[peaks.to.keep, samples.to.keep]
     list(
         sample.metadata=sample.metadata %>% filter(SampleID %in% samples.to.keep),
         residuals=peak.residuals.mx[peaks.to.keep, samples.to.keep],

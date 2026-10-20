@@ -33,5 +33,4 @@ DIFFERENTIAL_OCR_RDS_FILEPATH <-
         "CombinedDEGresult_GCv38_ATACseq_over45y_3CPM_List_08_20_26.RDs"
     )
 DIFFERENTIAL_OCR_TSV_FILEPATH <- file.path(INPUT_DATA_DIR, 'differential.OCR.results.tsv')
-ALL_CRD_PEAKLISTS_AND_LOCATIONS_FILEPATH <- here('results', 'all.CRDs.rds')
 ALL_CRD_STATS_TSV_FILEPATH <- here('results', 'all.CRD.stats.tsv')
