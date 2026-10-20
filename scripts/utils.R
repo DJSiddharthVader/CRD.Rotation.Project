@@ -472,8 +472,7 @@ list_all_results_files_in_set <- function(
     # List all CRDs results files with separate files for PeakLists and genomic positions
     } else if (set.name == 'CRDs') {
         CRD_RESULTS_DIR %>% 
-        parse_results_filelist(suffix='-decorate.CRDs.tsv', filename.column.name='info') %>% 
-        separate_wider_delim(info, delim='-', names=c('format')) %>% 
+        parse_results_filelist(suffix='-decorate.CRDs.tsv', filename.column.name='format') %>% 
         mutate(format=glue('{format}.filepath')) %>% 
         pivot_wider(names_from=format, values_from=filepath)
     # } else if (set.name == '') {

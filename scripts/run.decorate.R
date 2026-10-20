@@ -4,10 +4,8 @@
 library(here)
 source(here('scripts', 'basic.imports.R'))
 source(here('scripts', 'utils.SVs.R'))
-source(here('scripts', 'utils.decorate.R'))
 # load patient metadata
-all.sample.metadata <- 
-    load_sample_metadata()
+all.sample.metadata <- load_sample_metadata()
 
 ############################################################
 # Generate all input dataset + hyper-param combinations to test
@@ -86,12 +84,12 @@ all.peak.locations.granges <-
     load_peak_locations()
 # for all CRD blobs unpack the elements of the blob into .tsv files than can easily 
 list_all_results_files_in_set(set.name='CRD.blobs') %>% 
+    mutate(CRDID.prefix=glue('{AD.definition.column}-{sample.strategy}-')) %>% 
     # be parsed, loaded and aggregated for different downstream analyses
     future_pmap(
         .l=.,
         .f=unpack_decorate_blob,
-        results_fnc=unpack_decorate_blob,
         all.peak.locations.granges=all.peak.locations.granges,
         .progress=TRUE
-    ) 
+    )
 
