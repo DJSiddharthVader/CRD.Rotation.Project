@@ -19,37 +19,453 @@ results_filter_fnc <- function(df) {
     filter(n.SVs == NUM_SVS_TO_GENERATE) %>% 
     filter(SVs.included == NUM_SVS_TO_REMOVE)
 }
-
-n.CRDs.df <- 
-    load_all_CRD_data(filter_fnc=example_filter) %>% 
-    mutate(
-        n.CRDs=
-            future_pmap(
-                .l=list(CRDs),
-                .f=
-                    ~ .x %>% 
-                    mutate(n.peaks=pmap_int(.l=list(PeakList), .f=nrow)) %>% 
-                    summarize(
-                        .groups='drop',
-                        n.CRDs=n(),
-                        n.Peaks=sum(n.peaks)
-                    ),
-                .progress=TRUE
-            )
+```
+Load CRD features + summary stats over OCRs per CRD
+```{r load_CRD_features}
+all.CRD.features.df <- 
+    check_cached_results(
+        results_file=ALL_CRD_STATS_TSV_FILEPATH,
+        force_redo=FORCE_REDO,
+        results_fnc=
+            function() {
+                list_all_results_files_in_set(set.name='CRD.stats') %>% 
+                results_filter_fnc() %>% 
+                mutate(
+                    CRD.stats=
+                        future_pmap(
+                            .l=list(filepath),
+                            .progress=TRUE,
+                            .f=read_tsv,
+                            show_col_types=FALSE
+                        )
+                ) %>%
+                unnest(CRD.stats)
+            }
     ) %>% 
-    select(-c(CRDs)) %>% 
-    unnest(n.CRDs)
+    select(
+        CPM.cutoff, residual.model, 
+        # z.score.counts, n.SVs, SVs.included,
+        is.decorate.filtered,
+        AD.definition.column, sample.strategy, meanClusterSize, merging.level, 
+        CRDID, CRD.feature.type, CRD.feature, CRD.value
+    )
+```
+
+# Total CRD Size and Coverage
+
+Here I plot the total size and coverage of all CRDs in the genome across each set of CRDs estimated.
+
+```{r make_CRD_counts_data}
+stat.vars <- 
+    c(
+        "CRD.length",
+        "CRD.nPeaks",
+        'peak.length-total'
+    )
+CRD.counts.df <- 
+    all.CRD.features.df %>%
+    filter(CRD.feature %in% stat.vars) %>% 
+    select(-c(CRD.feature.type)) %>% 
+    pivot_wider(names_from=CRD.feature, values_from=CRD.value) %>% 
+    group_by(across(-all_of(c('CRDID', stat.vars)))) %>% 
+    summarize(
+        .groups='drop',
+        nCRDs=dplyr::n(),
+        CRD.length=sum(CRD.length),
+        CRD.nPeaks=sum(CRD.nPeaks),
+        `peak.length-total`=sum(`peak.length-total`)
+    ) %>%
+    mutate(
+        CRD.density=1e6 * CRD.nPeaks / CRD.length,
+        CRD.peak.coverage=100 * `peak.length-total` / CRD.length
+    ) %>% 
+    pivot_longer(
+        all_of(c(stat.vars, 'nCRDs', 'CRD.density', 'CRD.peak.coverage')),
+        names_to='CRD.feature',
+        values_to='CRD.value'
+    )
+```
+
+```{r plot_CRD_counts, results='asis'}
+#| echo: false
+#| fig-height: 4
+#| fig-width: 12
+
 nesting.vars <- 
     c(
         'CPM.cutoff',
         'residual.model'
         # 'AD.definition.column',
     )
-n.CRDs.df %>% 
+CRD.counts.df %>% 
+    left_join(
+        tribble(
+            ~CRD.feature,        ~feature.name,
+            "nCRDs",             '# of CRDs',               
+            "CRD.nPeaks",        'Total CRD Size (# OCRs)',
+            "CRD.length",        'Total CRD Size (bp)',
+            "peak.length-total", 'Total OCR Size (bp)',
+            "CRD.density",       '# OCRs per CRD Mb',
+            "CRD.peak.coverage", '% CRDs Covered by OCRs',
+        ) %>%
+        mutate(feature.name=fct_reorder(feature.name, row_number())),
+        by='CRD.feature'
+    ) %>% 
+    order_variable_for_plotting() %>% 
+    nest(plot.df=-all_of(c(nesting.vars))) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_barplot,
+                x.var='meanClusterSize',
+                y.var='CRD.value',
+                fill.var='sample.strategy',
+                facet.col='feature.name',
+                y.scale.mode='m',
+                y.axis.label.accuracy=1,
+                scales='free_y', independent='y',
+                # legend.position='top',
+                axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+                # axis.text.y=element_text(angle=45, vjust=1, hjust=1),
+                axis.title=element_blank(),
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=2,
+        output_var='figures',
+        tabset_vars=nesting.vars
+    )
+```
+
+# Compare Summary Stats over OCRs per peak pre/post merging 
+
+Now we can plot summary statistics across OCRs per CRD. 
+So for each CRD, compute statistics over OCR features (e.g. mean peak length (in bp)), then plot the distribution of this summary statistic across all CRDs for each feature.
+
+## OCR Features
+
+These features are related to OCR size and the size of the linked gene.
+
+```{r make_OCR_summary_data}
+OCR.summary.stats.df <- 
+    all.CRD.features.df %>% 
+    filter(CRD.feature.type %in% c('CRD.stats', 'peak.summary.stats')) %>%
+    separate_wider_delim(
+        CRD.feature,
+        delim='-',
+        names=c('feature', 'summary.stat'),
+        # too_few='align_end'
+        too_few='align_start'
+    ) %>%
+    mutate(summary.stat=ifelse(is.na(summary.stat), 'Size', summary.stat)) %>% 
+    # mutate(feature=ifelse(is.na(feature), 'Size', feature)) %>% 
+    filter(summary.stat != 'sd')
+```
+
+```{r plot_CRD_stats, results='asis'}
+#| echo: false
+#| fig-height: 4
+#| fig-width: 6
+# #| eval: false
+
+# Now plot correlation of SVs across datasets
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model',
+        'feature'
+        # 'AD.definition.column',
+    )
+OCR.summary.stats.df %>% 
+    mutate(CRD.value=ifelse(feature == 'CRD.density', 1e3 * CRD.value, CRD.value)) %>% 
+    left_join(
+        tribble(
+            ~feature,              ~feature.name,             ~y.scale.mode, ~y.axis.label.accuracy,
+            'gene.length',         'Assoc. Gene Length (bp)', 'mb',          1,
+            'peak.length',         'Peak Length (bp)',        'mb',          1,
+            'peak.distanceToTSS',  'Peak dist to TSS (bp)',   'mb',          1,
+            'CRD.length',          'CRD Size (bp)',           'mb',          1,
+            'CRD.nPeaks',          'CRD Size (# OCRs)',       'm',           1,
+            'CRD.density',         'OCRs per CRD Kb',         'm',           0.01,
+            'CRD.peak.coverage',   '% CRD Covered by OCRs',   'pct',         0.01,
+        ) %>% 
+        mutate(feature.name=fct_reorder(feature.name, row_number())),
+        by='feature'
+    ) %>% 
+    order_variable_for_plotting() %>% 
+    nest(plot.df=-all_of(c(nesting.vars, 'y.scale.mode', 'y.axis.label.accuracy'))) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_boxplot,
+                x.var='meanClusterSize',
+                y.var='CRD.value',
+                fill.var='sample.strategy',
+                facet.row=c('feature.name', 'summary.stat'),
+                scales='free_y',
+                # axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+                axis.title=element_blank(),
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=3,
+        output_var='figures',
+        tabset_vars=nesting.vars
+    )
+```
+
+## OCR Size Dynamics
+
+```{r plot_CRD_densities, results='asis'}
+#| echo: false
+#| fig-height: 4
+#| fig-width: 6
+
+# Now plot correlation of SVs across datasets
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model'
+        # 'feature'
+        # 'AD.definition.column',
+    )
+OCR.summary.stats.df %>% 
+                # x.var='meanClusterSize',
+                # y.var='CRD.value',
+                # fill.var='sample.strategy',
+                # facet.row=c('feature.name', 'summary.stat'),
+    filter(
+        CRD.feature %in% 
+            c(
+                CRD.length,        
+                CRD.nPeaks,        
+                `peak.length-total`
+            )
+    ) %>% 
+    # filter(CRD.feature.type == 'CRD.stats') %>% 
+    # pivot_longer(
+    #     names_from=
+    #         c(
+    #             CRD.length,        
+    #             CRD.nPeaks,        
+    #             `peak.length-total`,
+    #             CRD.peak.coverage 
+    #         ),
+    #     values_from=CRD.value
+    # ) %>% 
+    order_variable_for_plotting() %>% 
+    # nest(plot.df=-all_of(c(nesting.vars, 'y.scale.mode', 'y.axis.label.accuracy'))) %>% 
+    nest(plot.df=-all_of(c(nesting.vars))) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_boxplot,
+                x.var='meanClusterSize',
+                y.var='CRD.value',
+                fill.var='sample.strategy',
+                facet.row=c('feature.name', 'summary.stat'),
+                scales='free_y',
+                # axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+                axis.title=element_blank(),
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=3,
+        output_var='figures',
+        tabset_vars=nesting.vars
+    )
+```
+
+## OCR Types Frequencies per CRD
+
+Each OCR is annotated as a specific type, so for each CRD we compute the relative abundance of each peak type e.g. promoter vs enhancer.  
+Then for each category, we can plot the distribution of frequencies across all CRDs.
+
+```{r make_CRD_annotation_frequencies}
+CRD.annotation.frequencies.df <- 
+    all.CRD.features.df %>% 
+    filter(CRD.feature.type == 'peak.frequencies') %>% 
+    separate_wider_delim(
+        CRD.feature,
+        delim='-',
+        names=c('peak.annotation.type', 'peak.annotation', 'metric')
+    ) %>% 
+    filter(!(peak.annotation.type == 'merge.groups' & meanClusterSize != 'merged')) %>% 
+    mutate(
+        metric=
+            case_when(
+                metric == 'n'    ~ '# of Peaks in CRD',
+                metric == 'freq' ~ '% of Peaks in CRD',
+            )
+    )
+```
+
+```{r plot_CRD_annotation_frequencies, results='asis'}
+#| echo: false
+#| fig-height: 8
+#| fig-width: 10
+
+# Now plot correlation of SVs across datasets
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model',
+        'peak.annotation.type'
+        # 'AD.definition.column',
+    )
+CRD.annotation.frequencies.df %>% 
+    order_variable_for_plotting() %>% 
+    nest(plot.df=-all_of(nesting.vars)) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_boxplot,
+                y.var='peak.annotation',
+                x.var='CRD.value',
+                # y.scale.mode='pct',
+                fill.var='sample.strategy',
+                facet.row='metric',
+                facet.col='meanClusterSize',
+                scales='free_x', independent='x',
+                x.axis.label.accuracy=0.1,
+                outlier.size=0.05,
+                # legend.position='top',
+                axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+                axis.title=element_blank(),
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=3,
+        output_var='figures',
+        tabset_vars=nesting.vars
+    )
+```
+
+## OCR Differential statistics
+
+For each OCR + each contrast we have the differential OCR statistics i.e. logFC + p.adjust.
+Again we compute summary statistics for these metrics for each CRD separately, across all OCRs in the CRD. 
+Then we plot the distribution of these summary statistics across all CRDs.
+
+```{r make_CRD_differential_stats}
+all.CRD.differential.stats.df <-
+    all.CRD.features.df %>% 
+    filter(CRD.feature.type == 'peak.differential.stats') %>% 
+    separate_wider_delim(
+        CRD.feature,
+        delim='-',
+        names=c('contrast', 'metric', 'summary.stat')
+    ) %>%
+    filter(summary.stat != 'sd')
+```
+
+```{r plot_CRD_differential_stats, results='asis'}
+#| echo: false
+#| fig-height: 8
+#| fig-width: 10
+
+# Now plot correlation of SVs across datasets
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model',
+        # 'AD.definition.column',
+        'contrast'
+    )
+all.CRD.differential.stats.df %>% 
+    order_variable_for_plotting() %>% 
+    nest(plot.df=-all_of(c(nesting.vars))) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_boxplot,
+                x.var='meanClusterSize',c('metric', 'summary.stat'),
+                y.var='CRD.value',
+                fill.var='sample.strategy',
+                facet.row=c('metric', 'summary.stat'),
+                scales='free_y', independent='y',
+                # scales='free_y', space='free_y', independent='y',
+                legend.position='top',
+                axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+                axis.title=element_blank(),
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=3,
+        output_var='figures',
+        tabset_vars=nesting.vars
+    )
+```
+
+# Plot source frequencies of merged CRDs
+
+For all merged CRDs show what types of CRDs were merged to create them.
+
+```{r load_merged_CRDs}
+all.merged.CRDs.df <- 
+    list_all_results_files_in_set(set.name='merged.CRDs') %>% 
+    results_filter_fnc() %>% 
+    filter(merging.level != 'separate') %>% 
+    mutate(
+        CRDs=
+            future_pmap(
+                .l=.,
+                .f=combine_CRD_Locations_and_PeakLists,
+                .progress=TRUE
+            )
+    ) %>% 
+    unnest(CRDs) %>% 
+    select(
+        CPM.cutoff, residual.model, AD.definition.column,
+        z.score.counts, n.SVs, SVs.included,
+        sample.strategy, meanClusterSize, merging.level,
+        is.decorate.filtered,
+        CRDID, detected.in.groups
+    )
+```
+
+```{r plot_CRD_merge_origins, results='asis'}
+#| echo: false
+#| fig-height: 6
+#| fig-width: 10 
+
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model'
+        # 'AD.definition.column',
+    )
+all.merged.CRDs.df %>% 
+    count(
+        CPM.cutoff, residual.model, AD.definition.column,
+        z.score.counts, n.SVs, SVs.included,
+        sample.strategy, meanClusterSize, merging.level,
+        detected.in.groups, 
+    ) %>%
+    group_by(across(-all_of(c('detected.in.groups', 'n')))) %>% 
+    mutate(freq=100 * n / sum(n)) %>%
+    ungroup() %>% 
     pivot_longer(
-        c(n.Peaks, n.CRDs),
+        c(n, freq),
         names_to='metric',
-        values_to='n'
+        values_to='value'
+    ) %>%  
+    mutate(
+        metric=
+            case_when(
+                metric == 'n'    ~ '# of CRDs',
+                metric == 'freq' ~ '% of CRDs',
+            )
     ) %>% 
     order_variable_for_plotting() %>% 
     nest(plot.df=-all_of(nesting.vars)) %>% 
@@ -58,16 +474,20 @@ n.CRDs.df %>%
             pmap(
                 .l=.,
                 .f=plot_barplot,
-                x.var='is.filtered',
-                y.var='n',
-                y.scale.mode='m',
+                y.var='detected.in.groups',
+                x.var='value',
                 fill.var='sample.strategy',
-                facet.col='meanClusterSize',
-                facet.row='metric',
+                facet.col='metric',
+                facet.row='sample.strategy',
+                x.scale.mode='m',
+                # scales='free', space='free',
+                scales='free', independent='x',
                 # scales='free_y', independent='y',
-                scales='free_y', independent=FALSE,
-                y.axis.label.accuracy=0.1,
-                axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+                # scales='free_y', independent=FALSE,
+                # legend.position='top',
+                x.axis.label.accuracy=1,
+                # axis.text.x=element_text(angle=45, vjust=0.5, hjust=1),
+                # axis.text.x=element_text(angle=45, vjust=1, hjust=1),
                 axis.title=element_blank(),
                 .progress=TRUE
             )
@@ -79,111 +499,6 @@ n.CRDs.df %>%
     )
 ```
 
-# Compare CRD features across subsets, before and after decorate filtering + collapsing
-
-```{r load_CRD_stats}
-all.CRD.stats.df <- 
-    ALL_CRD_STATS_TSV_FILEPATH %>%
-    read_tsv(show_col_types=FALSE) %>% 
-    filter(
-        CRD.feature %in% 
-            c(
-                'CRD.length',              
-                'CRD.nPeaks',              
-                # 'mean-logFC',              
-                'med-logFC',               
-                # 'var-logFC',               
-                # 'total-logFC',             
-                'mean-log10.p.adjust',     
-                # 'med-log10.p.adjust',      
-                # 'var-log10.p.adjust',      
-                'total-log10.p.adjust',    
-                'mean-peak.length',        
-                # 'med-peak.length',         
-                # 'var-peak.length',         
-                'total-peak.length',       
-                # 'mean-peak.distanceToTSS', 
-                # 'med-peak.distanceToTSS',  
-                # 'total-peak.distanceToTSS',
-                'mean-gene.length'
-            )
-    ) %>% 
-    mutate(meanClusterSize=factor(meanClusterSize)) %>% 
-    mutate( 
-        feature.type=   
-            case_when(  
-                # str_detect(CRD.feature, 'length|distance') ~ 'length',
-                str_detect(CRD.feature, 'length') ~ 'length',
-                CRD.feature == 'CRD.nPeaks' ~ 'nPeaks',
-                TRUE ~ 'differential'
-            )
-    )
-# all.CRD.stats.df %>% count(feature.type)
-```
-
-```{r plot_CRD_stat_distributions, results='asis'}
-#| echo: false
-#| fig-height: 6
-#| fig-width: 10
-# #| eval: false
-
-# Now plot correlation of SVs across datasets
-nesting.vars <- 
-    c(
-        'CPM.cutoff',
-        'residual.model',
-        # 'AD.definition.column',
-        'contrast',
-        'feature.type'
-    )
-all.CRD.stats.df %>% 
-    order_variable_for_plotting() %>% 
-    nest(plot.df=-all_of(nesting.vars)) %>% 
-    left_join(
-        tribble(
-            ~ feature.type, ~ x.scale.mode, ~ x.axis.label.accuracy,
-            'length',       'mb',           0.1,
-            'nPeaks',       'm',            0.1,
-            'differential', '',             0.01,
-        ),
-        by='feature.type'
-    ) %>% 
-    mutate(
-        figures=
-            pmap(
-                .l=.,
-                .f=plot_boxplot,
-                x.var='CRD.value',
-                y.var='meanClusterSize',
-                fill.var='sample.strategy',
-                facet.row='is.filtered',
-                facet.col='CRD.feature', 
-                y.scale.mode='discrete',
-                scales='free_x',
-                # space='free',
-                # independent='all',
-                legend.position='top',
-                axis.text.x=element_text(angle=45, vjust=1, hjust=1),
-                axis.title=element_blank(),
-                .progress=TRUE
-            )
-    ) %>% 
-    custom_render_tabset(
-        starting.hlevel=2,
-        output_var='figures',
-        tabset_vars=nesting.vars
-    )
-```
-
-# Plot effects of merging across meanClusterSizes + Sample Sets
-
-```{r load}
-```
-
-```{r plot, results='asis'}
-#| echo: false
-#| fig-width: 6
-#| fig-height: 4
 ```
 
 # Define AD/Control-specific CRDs and plot features
