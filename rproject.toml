@@ -58,4 +58,6 @@ dependencies = [
     "ggridges",
     "ggragged",
     "plyranges",
+    "ggExtra",
+    "ggside",
 ]

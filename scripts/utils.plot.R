@@ -9,12 +9,12 @@ suppressPackageStartupMessages({
     library(GGally)
     library(scales)
     library(ggragged)
+    # library(ggExtra)
+    library(ggside)
     # library(ggpointdensity)
     # library(viridis)
     library(ComplexUpset)
     library(quarto)
-    # library(quartabs)
-    # source(here('scripts', 'custom.render.tabset.R'))
 })
 
 ###################################################
@@ -202,7 +202,8 @@ make_facet_formula <- function(
     } else if (!is.null(facet.group)) {
         formula(glue('~ {paste(facet.group, collapse=" + ")}'))
     } else {
-        stop(glue('Invalid faceting variable selection'))
+        return(NULL)
+        # stop(glue('Invalid faceting variable selection: {facet.group}. {facet.col}, {facet.row}'))
     }
 }
 
@@ -236,15 +237,16 @@ add_faceting <- function(
     if (!is.null(facet.group)) {
         figure <- 
             figure +
+            # facet_wrap(
             facet_wrap2(
                 vars(!!sym(facet.group)),
                 nrow=facet.nrow,
                 ncol=facet.ncol,
                 scales=scales, 
-                # space=space,
                 axes=independent,
-                drop=drop,
-                # ...
+                # drop=drop,
+                # space=space,
+                ...
             )
     } else {
         if (ragged == 'r') {
@@ -402,23 +404,6 @@ post_process_plot <- function(
             .
         }
     } %>% 
-    # Set linetype scaling (log, Mb, percent etc.)
-    # {
-    #     if ('linetype' %in% names(figure@mapping)) {
-    #         scale_axis(
-    #             figure=.,
-    #             scale.axis='linetype',
-    #             scale.mode=linetype.scale.mode,
-    #             log.base=linetype.log.base,
-    #             axis.label.accuracy=linetype.axis.label.accuracy,
-    #             n.breaks=linetype.n.breaks,
-    #             limits=linetype.limits,
-    #             expand=linetype.expand
-    #         )
-    #     } else {
-    #         .
-    #     }
-    # } %>% 
     # Add theme elements, as either an object or individual args
     {
         if (!is.null(theme.obj)) {
@@ -794,89 +779,6 @@ plot_ridges <- function(
     )
 }
 
-plot_histogram <- function(
-    plot.df,
-    x.var='',
-    fill.var=NULL, 
-    alpha=0.7,
-    binwidth=0.05,
-    position='stack',
-    ...){
-    { 
-        ggplot(
-            plot.df,
-            aes(x=.data[[x.var]])
-        ) 
-    } %>%
-    {
-        if (!is.null(fill.var)) {
-            . + aes(fill=.data[[fill.var]])
-            # . + aes(color=.data[[fill.var]])
-        } else {
-            .
-        }
-    } %>% 
-    {
-        . +
-        # geom_freqpoly(
-        geom_histogram(
-            position=position,
-            alpha=alpha,
-            binwidth=binwidth
-        ) 
-    } %>% 
-    # Handle faceting + scaling + theme options
-    post_process_plot(...)
-}
-
-plot_violin <- function(
-    plot.df,
-    x.var='',
-    y.var='',
-    fill.var=NULL, 
-    plot_pts=FALSE,
-    jitter.size=0.1,
-    quantile.color=NULL,
-    draw.quantiles=0L,
-    quantile.linewidth=NULL,
-    position='dodge',
-    adjust=0.5,
-    ...){
-    # make it a violin plot
-    { 
-        ggplot(
-            plot.df,
-            aes(
-                x=.data[[x.var]],
-                y=.data[[y.var]],
-                fill=.data[[fill.var]],
-            )
-        )
-    } %>%
-    {
-        .+
-        geom_violin(
-            quantile.color=quantile.color,
-            quantile.linetype=draw.quantiles,
-            quantile.linewidth=quantile.linewidth,
-            position=position,
-            adjust=adjust
-        )
-    } %>% 
-    # plot individual points if specified
-    {
-        if (plot_pts){
-            . +
-            geom_jitter(size=jitter.size)
-            # geom_jitter(aes(size=jitter.size))
-        } else {
-            .
-        }
-    } %>% 
-    # Handle faceting + scaling + theme options
-    post_process_plot(...)
-}
-
 plot_heatmap <- function(
     plot.df,
     x.var='',
@@ -996,6 +898,121 @@ plot_jitter <- function(
     )
 }
 
+plot_scatter_marginal <- function(
+    plot.df,
+    x.var='',
+    y.var='',
+    color.var=NA, 
+    size.var=NA,
+    regression_fnc=NULL,
+    add_regression_SE=TRUE,
+    alpha=0.5,
+    size=0.5,
+    margin.type='boxplot',
+    show.outliers=FALSE,
+    # which.margins='both',
+    margin.size=0.3,
+    scales='fixed',
+    ...){
+    is.color.categorical <- 
+        case_when(
+            is.na(color.var) ~ 'NA',
+            is.factor(plot.df[[color.var]]) | is.character(plot.df[[color.var]]) ~ 'grouping',
+            TRUE ~ 'continuous'
+        )
+    # specify ggplot varialbes based on whether color variable is null or categorical
+    {
+        if (is.color.categorical == 'grouping') {
+            if (!is.na(size.var)) { 
+                ggplot(plot.df, aes_string(x=x.var, y=y.var, color=color.var, fill=color.var)) +
+                geom_point(aes_string(size=size.var), alpha=alpha)
+            } else { 
+                ggplot(plot.df, aes_string(x=x.var, y=y.var, color=color.var, fill=color.var)) +
+                geom_point(size=size, alpha=alpha)
+            }
+        } else if (is.color.categorical == 'continuous') {
+            if (!is.na(size.var)) { 
+                ggplot(plot.df, aes_string(x=x.var, y=y.var)) +
+                geom_point(aes_string(color=color.var, size=size.var), alpha=alpha)
+            } else { 
+                ggplot(plot.df, aes_string(x=x.var, y=y.var)) +
+                geom_point(aes_string(color=color.var), size=size, alpha=alpha)
+            }
+        } else {
+            if (!is.na(size.var)) { 
+                ggplot(plot.df, aes_string(x=x.var, y=y.var)) +
+                geom_point(aes_string(size=size.var), alpha=alpha)
+            } else { 
+                ggplot(plot.df, aes_string(x=x.var, y=y.var)) +
+                geom_point(size=size, alpha=alpha)
+            }
+        }
+    } %>% 
+    # add marginals to scatter plot
+    {
+        if (margin.type == 'density') {
+            . +
+            geom_xsidedensity(
+                aes(y=after_stat(density)),
+                alpha=alpha,
+                position="stack"
+            ) +
+            geom_ysidedensity(
+                aes(x=after_stat(density)),
+                alpha=alpha,
+                position="stack"
+            ) +
+            ggside(scales=scales)
+        } else if (margin.type == 'boxplot') {
+            . + 
+            geom_xsideboxplot(
+                orientation='x',
+                scales=scales,
+                outliers=show.outliers
+            ) + 
+            geom_ysideboxplot(
+                orientation='y',
+                scales=scales,
+                outliers=show.outliers
+            ) +
+            ggside(scales=scales)
+        } else if (margin.type == 'hist') {
+            . + geom_ysidehistogram() + geom_xsidehistogram() + ggside(scales=scales)
+        } else {
+            .
+        }
+    } %>% 
+    # add regression line(s) is specified
+    {
+        if (!is.null(regression_fnc)) {
+            if (is.color.categorical == 'grouping') {
+                . +
+                geom_smooth(
+                    aes_string(color=color.var),
+                    method=regression_fnc,
+                    se=add_regression_SE
+                )
+            } else { 
+                . +
+                geom_smooth(
+                    method=regression_fnc,
+                    se=add_regression_SE
+                )
+            }
+        } else {
+            .
+        }
+    } %>% 
+    # Handle faceting + scaling + theme options
+    post_process_plot(
+        scales=scales,
+        ggside.panel.scale=margin.size,
+        ggside.panel.grid=element_blank(),
+        ggside.panel.background=element_blank(),
+        ...
+    )
+}
+
 plot_lineplot <- function(
     plot.df,
     x.var='',
@@ -1094,97 +1111,5 @@ plot_ribbonplot <- function(
         # scales=scales,
         ...
     )
-}
-
-plot_pointdensity <- function(
-    plot.df,
-    x.var='',
-    y.var='',
-    adjust=0.5,
-    size=0.5,
-    scales='fixed',
-    ...){
-    # make it a scatter plot
-    { 
-        ggplot(
-            plot.df,
-            aes(
-                x=.data[[x.var]],
-                y=.data[[y.var]]
-            )
-        ) +
-        geom_pointdensity(
-            adjust=adjust,
-            size=size
-        ) +
-        scale_color_viridis()
-    } %>% 
-    # Handle faceting + scaling + theme options
-    post_process_plot(
-        scales=scales,
-        color.scale.mode='',
-        fill.scale.mode='',
-        ...
-    )
-}
-
-plot_ggpairs <- function(
-    freq.df,
-    group.colname='Sample.Group',
-    value.colname='value',
-    color.colname=NULL,
-    pt.alpha=0.6,
-    text.size=8,
-    linewidth=0.15,
-    ...){
-    plot.df <- 
-        freq.df %>% 
-        pivot_wider(
-            names_from=!!sym(group.colname),
-            names_prefix='group_',
-            values_from=!!sym(value.colname)
-        ) %>%  
-        unnest(starts_with('group_'))
-    cols.to.keep <- 
-        plot.df %>% 
-        summarize(across(everything(), ~ sum(!is.na(.x)) > 0)) %>%
-        pivot_longer(everything(), names_to='colname', values_to='is.not.all.NAs') %>% 
-        mutate(is.group.col=str_detect(colname, '^group_')) %>%
-        filter((is.group.col & is.not.all.NAs) | !is.group.col) %>% 
-        pull(colname) %>% 
-        c(., color.colname) %>%
-        unique()
-    plot.df <- 
-        plot.df %>% 
-        select(cols.to.keep)
-    cols <- 
-        grep('^group_', colnames(plot.df), value=TRUE)
-    cols.names <- 
-        str_remove(cols, '^group_')
-    mapping <- 
-        if (!is.null(color.colname)) {
-            aes(color=.data[[color.colname]], alpha=pt.alpha)
-        } else {
-            aes(alpha=pt.alpha)
-        }
-    # print(cols.to.keep)
-    # return(plot.df)
-    ggpairs(
-        plot.df,
-        mapping=mapping,
-        # columns=which(colnames(plot.df) %in% cols),
-        columns=cols,
-        columnLabels=cols.names
-    ) +
-    geom_abline(intercept=0, slope= 1, linewidth=linewidth, color='black', linetype='dashed') +
-    geom_abline(intercept=0, slope=-1, linewidth=linewidth, color='black', linetype='dashed') +
-    geom_vline(xintercept=0,           linewidth=linewidth, color='black', linetype='solid') +
-    geom_hline(yintercept=0,           linewidth=linewidth, color='black', linetype='solid') +
-    theme(
-        axis.text.x=element_text(size=text.size),
-        axis.text.y=element_text(size=text.size),
-        strip.text=element_text(size=text.size+1)
-    ) + 
-    make_ggtheme()
 }
 

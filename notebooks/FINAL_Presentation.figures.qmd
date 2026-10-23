@@ -1,0 +1,1040 @@
+---
+title: "Summary Figures" 
+date: "`r Sys.Date()`"
+metadata-files:
+  - _report_options.yml
+---
+
+{{< include _imports.qmd >}}
+
+# Load all CRD data
+
+```{r notebook opts}
+FORCE_REDO <- FALSE
+# FORCE_REDO <- TRUE
+results_filter_fnc <- function(df) {
+    df %>% 
+    filter(CPM.cutoff == '3CPM') %>% 
+    filter(z.score.counts) %>% 
+    filter(n.SVs == NUM_SVS_TO_GENERATE) %>% 
+    filter(SVs.included == NUM_SVS_TO_REMOVE)
+}
+FDR.line <- 
+    geom_hline(yintercept=-log10(0.05), linetype='dashed', color='red', linewidth=0.2)
+direction.line <- 
+    geom_vline(xintercept=0, linetype='dashed', color='black', linewidth=0.2)
+volcano.plot.elements <- 
+    list(
+        direction.line,
+        FDR.line,
+        # scale_color_viridis_c(alpha=0.5),
+        labs(x='Test Statistic', y='-log10(p-value)')
+    )
+```
+Load all merged CRDs
+```{r load_merged_CRDs}
+add_merge_origin_annotations <- function(df){
+    df %>% 
+    left_join(
+        all.merged.CRDs.df,
+        by=
+            intersect(
+                colnames(df),
+                colnames(all.merged.CRDs.df)
+            )
+    )
+}
+all.merged.CRDs.df <- 
+    list_all_results_files_in_set(set.name='merged.CRDs') %>% 
+    results_filter_fnc() %>% 
+    filter(merging.level != 'separate') %>% 
+    mutate(
+        CRDs=
+            future_pmap(
+                .l=.,
+                .f=combine_CRD_Locations_and_PeakLists,
+                .progress=TRUE
+            )
+    ) %>% 
+    unnest(CRDs) %>% 
+    select(
+        CPM.cutoff, residual.model, AD.definition.column,
+        z.score.counts, n.SVs, SVs.included,
+        sample.strategy, meanClusterSize, merging.level,
+        is.decorate.filtered,
+        CRDID, detected.in.groups
+    ) %>% 
+    mutate(CRD.sample.strategy=sample.strategy)
+```
+Load differential CRD statistics
+```{r load_all_differential_stats}
+all.differential.CRD.results.df <- 
+    check_cached_results(
+        results_file=ALL_CRD_DIFFERENTIAL_STATS_TSV_FILEPATH,
+        force_redo=FORCE_REDO,
+        # force_redo=TRUE,
+        results_fnc=
+            function() {
+                list_all_results_files_in_set(set.name='CRD.differential.stats') %>%
+                mutate(
+                    diff.stats=
+                        future_pmap(
+                            .l=list(filepath),
+                            .f=read_tsv,
+                            show_col_types=FALSE,
+                            .progress=TRUE
+                        )
+                ) %>%
+                unnest(diff.stats) %>%
+                filter(nPeaks >= 5) %>% 
+                # count CRDs per pre-merged origin grouping
+                group_by(
+                    CPM.cutoff, residual.model, CRD.sample.strategy,
+                    z.score.counts, n.SVs, SVs.included,
+                    meanClusterSize, is.decorate.filtered,
+                    contrast, method,
+                    detected.in.groups
+                ) %>% 
+                mutate(nCRDs=length(unique(CRDID))) %>%
+                ungroup(detected.in.groups) %>% 
+                mutate(
+                    log10.p.value=-log10(p.value),
+                    p.adjust=p.adjust(p.value, method='BH'),
+                    log10.p.adjust=-log10(p.adjust)
+                ) %>% 
+                ungroup()
+            }
+    ) %>% 
+    filter(
+        contrast %in% 
+            c(
+                "sex-Male-Female",
+                # "Biobank-Rush-MSBB",
+                # "Braak_3levels-Braak_5plus-Braak_Max2",
+                "Braak_3levels-Braak_5plus-Braak_3to4",
+                "CDR_3levels-Dementia-Healthy",
+                "age-NA-NA",
+                "AD_CERAD_withDLB-AD-Control"
+            )
+    ) %>% 
+    filter(!is.na(p.value)) %>% 
+    select(-c(count, filepath))
+```
+Load CRD features + summary stats over OCRs per CRD
+```{r load_CRD_features}
+all.CRD.features.df <- 
+    check_cached_results(
+        results_file=ALL_CRD_STATS_TSV_FILEPATH,
+        force_redo=FORCE_REDO,
+        results_fnc=
+            function() {
+                list_all_results_files_in_set(set.name='CRD.stats') %>% 
+                results_filter_fnc() %>% 
+                mutate(
+                    CRD.stats=
+                        future_pmap(
+                            .l=list(filepath),
+                            .progress=TRUE,
+                            .f=read_tsv,
+                            show_col_types=FALSE
+                        )
+                ) %>%
+                unnest(CRD.stats)
+            }
+    ) %>% 
+    select(
+        CPM.cutoff, residual.model, 
+        # z.score.counts, n.SVs, SVs.included,
+        is.decorate.filtered,
+        AD.definition.column, sample.strategy, meanClusterSize, merging.level, 
+        CRDID, CRD.feature.type, CRD.feature, CRD.value
+    )
+```
+For all merged CRDs, get features for each CRD
+```{r get_OCR_feature_summaries_per_CRD}
+OCR.summary.stats.df <- 
+    all.CRD.features.df %>% 
+    filter(CRD.feature.type %in% c('CRD.stats', 'peak.summary.stats')) %>%
+    separate_wider_delim(
+        CRD.feature,
+        delim='-',
+        names=c('feature', 'summary.stat'),
+        # too_few='align_end'
+        too_few='align_start'
+    ) %>%
+    mutate(summary.stat=ifelse(is.na(summary.stat), 'Size', summary.stat)) %>% 
+    # mutate(feature=ifelse(is.na(feature), 'Size', feature)) %>% 
+    filter(summary.stat != 'sd')
+```
+For all merged CRDs, load OCR-level summary stats of differentila stats (logFC + p.value)
+```{r get_OCR_differential_summaries_per_CRD}
+all.CRD.differential.stats.df <-
+    all.CRD.features.df %>% 
+    filter(meanClusterSize == 'merged') %>% 
+    filter(CRD.feature.type == 'peak.differential.stats') %>% 
+    separate_wider_delim(
+        CRD.feature,
+        delim='-',
+        names=c('contrast', 'metric', 'summary.stat')
+    ) %>%
+    filter(summary.stat != 'sd')
+```
+
+# Total CRD Size and Coverage
+
+Here I plot the total size and coverage of all CRDs in the genome across each set of CRDs estimated.
+```{r make_CRD_counts_data}
+#| eval: false
+
+stat.vars <- 
+    c(
+        "CRD.length",
+        "CRD.nPeaks",
+        'peak.length-total'
+    )
+CRD.counts.df <- 
+    all.CRD.features.df %>%
+    filter(CRD.feature %in% stat.vars) %>% 
+    select(-c(CRD.feature.type)) %>% 
+    pivot_wider(names_from=CRD.feature, values_from=CRD.value) %>% 
+    group_by(across(-all_of(c('CRDID', stat.vars)))) %>% 
+    summarize(
+        .groups='drop',
+        nCRDs=dplyr::n(),
+        CRD.length=sum(CRD.length),
+        CRD.nPeaks=sum(CRD.nPeaks),
+        `peak.length-total`=sum(`peak.length-total`)
+    ) %>%
+    mutate(
+        CRD.density=1e6 * CRD.nPeaks / CRD.length,
+        CRD.peak.coverage=100 * `peak.length-total` / CRD.length
+    ) %>% 
+    pivot_longer(
+        all_of(c(stat.vars, 'nCRDs', 'CRD.density', 'CRD.peak.coverage')),
+        names_to='CRD.feature',
+        values_to='CRD.value'
+    )
+```
+
+```{r plot_CRD_counts, results='asis'}
+#| eval: false
+#| echo: false
+#| fig-height: 4
+#| fig-width: 12
+
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model'
+        # 'AD.definition.column',
+    )
+CRD.counts.df %>% 
+    inner_join(
+        tribble(
+            ~CRD.feature,        ~feature.name,
+            "nCRDs",             '# of CRDs',               
+            "CRD.nPeaks",        'Total CRD Size (# OCRs)',
+            "CRD.length",        'Total CRD Size (bp)',
+            "peak.length-total", 'Total OCR Size (bp)',
+            "CRD.density",       '# OCRs per CRD Mb',
+            "CRD.peak.coverage", '% CRDs Covered by OCRs',
+        ) %>%
+        mutate(feature.name=fct_reorder(feature.name, row_number())),
+        by='CRD.feature'
+    ) %>% 
+    order_variable_for_plotting() %>% 
+    nest(plot.df=-all_of(c(nesting.vars))) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_barplot,
+                x.var='meanClusterSize',
+                y.var='CRD.value',
+                fill.var='sample.strategy',
+                facet.col='feature.name',
+                y.scale.mode='m',
+                y.axis.label.accuracy=1,
+                scales='free_y', independent='y',
+                # legend.position='top',
+                axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+                # axis.text.y=element_text(angle=45, vjust=1, hjust=1),
+                axis.title=element_blank(),
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=2,
+        output_var='figures',
+        tabset_vars=nesting.vars
+    )
+```
+
+# Which merged CRDs were only detected in specific conditions (AD vs Control)?
+
+For all merged CRDs show what types of CRDs were merged to create them.
+
+```{r plot_CRD_merge_origins, results='asis'}
+#| eval: false
+#| echo: false
+#| fig-height: 6
+#| fig-width: 10 
+
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model'
+        # 'AD.definition.column',
+    )
+all.merged.CRDs.df %>% 
+    count(
+        CPM.cutoff, residual.model, AD.definition.column,
+        z.score.counts, n.SVs, SVs.included,
+        sample.strategy, meanClusterSize, merging.level,
+        detected.in.groups, 
+    ) %>%
+    group_by(across(-all_of(c('detected.in.groups', 'n')))) %>% 
+    mutate(freq=100 * n / sum(n)) %>%
+    ungroup() %>% 
+    pivot_longer(
+        c(n, freq),
+        names_to='metric',
+        values_to='value'
+    ) %>%  
+    mutate(
+        metric=
+            case_when(
+                metric == 'n'    ~ '# of CRDs',
+                metric == 'freq' ~ '% of CRDs',
+            )
+    ) %>% 
+    order_variable_for_plotting() %>% 
+    nest(plot.df=-all_of(nesting.vars)) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_barplot,
+                y.var='detected.in.groups',
+                x.var='value',
+                fill.var='sample.strategy',
+                facet.col='metric',
+                facet.row='sample.strategy',
+                x.scale.mode='m',
+                # scales='free', space='free',
+                scales='free', independent='x',
+                # scales='free_y', independent='y',
+                # scales='free_y', independent=FALSE,
+                # legend.position='top',
+                x.axis.label.accuracy=1,
+                # axis.text.x=element_text(angle=45, vjust=0.5, hjust=1),
+                # axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+                axis.title=element_blank(),
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=2,
+        output_var='figures',
+        tabset_vars=nesting.vars
+    )
+```
+
+# Plot distributions of CRD features across all merged CRDs
+
+```{r pairplot_wrapper}
+make_pairplot <- function(
+    freq.df,
+    group.colname='feature.name',
+    value.colname='CRD.value',
+    color.colname='sample.strategy',
+    linewidth=0.2,
+    text.size=7,
+    alpha=0.5,
+    ...){
+    plot.df <- 
+        freq.df %>% 
+        pivot_wider(
+            names_from=!!sym(group.colname),
+            names_prefix='group_',
+            values_from=!!sym(value.colname),
+        )
+    cols.to.plot <- grep('^group_', colnames(plot.df), value=TRUE)
+    if (!is.na(color.colname)) {
+        maps <- aes(color=.data[[color.colname]], alpha=alpha)
+    } else {
+        maps <- aes(alpha=alpha)
+    }
+    ggpairs(
+        plot.df,
+        mapping=maps,
+        columns=cols.to.plot,
+        columnLabels=str_remove(cols.to.plot, '^group_'),
+    ) +
+    geom_abline(
+        intercept=0,
+        slope= 1,
+        linewidth=linewidth,
+        color='black',
+        linetype='dashed'
+    ) +
+    geom_abline(
+        intercept=0,
+        slope=-1,
+        linewidth=linewidth,
+        color='black',
+        linetype='dashed'
+    ) +
+    geom_vline(
+        xintercept=0,
+        linewidth=linewidth,
+        color='black',
+        linetype='solid'
+    ) +
+    geom_hline(
+        yintercept=0,
+        linewidth=linewidth,
+        color='black',
+        linetype='solid'
+    ) +
+    theme(
+        axis.text.x=element_text(size=text.size),
+        axis.text.y=element_text(size=text.size),
+        strip.text=element_text(size=text.size+1)
+    ) + 
+    make_ggtheme()
+}
+```
+
+Plot distirbution of CRD features across all CRDs, compare distributions
+```{r plot_all_CRD_stats, results='asis'}
+#| echo: false
+#| fig-width: 8
+#| fig-height: 8
+#| eval: false
+
+# Now plot correlation of SVs across datasets
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model'
+        # 'AD.definition.column',
+    )
+# OCR.summary.stats.df %>% head(1) %>% t()
+# OCR.summary.stats.df %>% count(CRD.feature.type, feature, summary.stat)
+# OCR.summary.stats.df %>% count(sample.strategy, meanClusterSize, merging.level)
+OCR.summary.stats.df %>% 
+    filter(summary.stat != 'total') %>% 
+    filter(meanClusterSize == 'merged') %>% 
+    inner_join(
+        tribble(
+            ~feature,              ~feature.name,             
+            'gene.length',         'mean Assoc. Gene Length (bp)',
+            'peak.length',         'mean OCR Length (bp)',
+            'peak.distanceToTSS',  'mean OCR dist to TSS (bp)',
+            'CRD.length',          'CRD Size (bp)',
+            'CRD.nPeaks',          'CRD Size (# OCRs)',
+            'CRD.peak.coverage',   '% CRD Covered by OCRs',
+        ) %>% 
+        mutate(feature.name=fct_reorder(feature.name, row_number())),
+        by='feature'
+    ) %>% 
+    select(-c(feature, CRD.feature.type, summary.stat)) %>% 
+    order_variable_for_plotting() %>% 
+    nest(freq.df=-all_of(c(nesting.vars))) %>% 
+        # {.} -> tmp; freq.df=tmp$freq.df[[1]]; freq.df %>% head(1) %>% t()
+        # freq.df %>% count(feature.name, !is.na(CRD.value))
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=make_pairplot,
+                linewidth=0.1,
+                text.size=4,
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=3,
+        output_var='figures',
+        tabset_vars=nesting.vars
+    )
+```
+
+# Plot summaries of OCR-level differential stats
+
+```{r plot_OCR_differential_summaries, results='asis'}
+#| echo: false
+#| fig-height: 8
+#| fig-width: 10
+#| eval: false
+
+# #| eval: false
+# Now plot correlation of SVs across datasets
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model'
+    )
+# all.CRD.differential.stats.df %>% colnames()
+# all.CRD.differential.stats.df %>% count(sample.strategy, CRD.feature.type, contrast, summary.stat)
+all.CRD.differential.stats.df %>% 
+    order_variable_for_plotting() %>% 
+    nest(plot.df=-all_of(c(nesting.vars))) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_boxplot,
+                x.var='contrast',
+                y.var='CRD.value',
+                fill.var='sample.strategy',
+                facet.row=c('metric', 'summary.stat'),
+                scales='free_y', independent='y',
+                plot.elements=list(FDR.line),
+                # scales='free_y', space='free_y', independent='y',
+                # legend.position='top',
+                # axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+                axis.title=element_blank(),
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=2,
+        output_var='figures',
+        tabset_vars=nesting.vars
+    )
+```
+
+# Plot CRD differential statistics from decorate
+
+Plot individual test statistics vs p-values for each CRD for each test from decorate.
+```{r plot_CRD_differential_summaries, results='asis'}
+#| echo: false
+#| fig-height: 12 
+#| fig-width: 14
+#| eval: false
+
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model'
+        # 'AD.definition.column',
+    )
+# all.differential.CRD.results.df %>% colnames()
+# all.differential.CRD.results.df %>% count(CRD.sample.strategy, contrast, method)
+all.differential.CRD.results.df %>% 
+    pivot_longer(
+        c(p.adjust, p.value, log10.p.adjust, log10.p.value),
+        names_to='metric',
+        values_to='value'
+    ) %>% 
+    filter(
+        metric %in%
+            c(
+                # p.value,
+                'log10.p.value',
+                # p.adjust,
+                'log10.p.adjust'
+            )
+    ) %>% 
+    order_variable_for_plotting() %>% 
+    nest(plot.df=-all_of(c(nesting.vars))) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_boxplot,
+                x.var='CRD.sample.strategy',
+                y.var='value',
+                color.var='CRD.sample.strategy',
+                facet.col='contrast', facet.row=c('metric', 'method'),
+                scales='free_y',
+                legend.position='top',
+                axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+                axis.title=element_blank(),
+                plot.elements=list(geom_hline(yintercept=-log10(0.05), linetype='dashed', color='red', linewidth=0.2)),
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=2,
+        output_var='figures',
+        tabset_vars=nesting.vars
+    )
+
+```
+
+# Plot Number of differential CRDs 
+
+```{r plot_CRD_differential_barplot, results='asis'}
+# #| eval: false
+#| echo: false
+#| fig-height: 10 
+#| fig-width: 14
+
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model'
+        # 'method'
+        # 'AD.definition.column',
+    )
+# all.differential.CRD.results.df %>% colnames()
+# all.differential.CRD.results.df %>% count(CRD.sample.strategy, contrast, method)
+all.differential.CRD.results.df %>% 
+    mutate(
+        is.sig.lvl=
+            case_when(
+                p.adjust < 0.05 ~ 'FDR',
+                p.value < 0.05 ~ 'nominal',
+                TRUE ~ 'N.S.'
+            ) %>%
+            factor(levels=c('FDR', 'nominal', 'N.S.'))
+    ) %>% 
+    count(
+        CPM.cutoff, residual.model, CRD.sample.strategy,
+        contrast, method,
+        # detected.in.groups,
+        is.sig.lvl
+    ) %>% 
+    group_by(across(-all_of(c('is.sig.lvl', 'n')))) %>% 
+    mutate(freq=n / sum(n)) %>%
+    ungroup() %>% 
+    order_variable_for_plotting() %>% 
+    nest(plot.df=-all_of(c(nesting.vars))) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_barplot,
+                x.var='CRD.sample.strategy',
+                y.var='freq',
+                fill.var='is.sig.lvl',
+                facet.col='contrast',
+                facet.row='method',
+                position='stack',
+                y.scale.mode='pct',
+                # scales='free_y',
+                # legend.position='none',
+                axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+                axis.title=element_blank(),
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=2,
+        output_var='figures',
+        tabset_vars=nesting.vars
+    )
+```
+
+# Compare CRD-level vs OCR-level differential statistics 
+
+Comapre OCR-level differential summary stats vs CRD-level p-values across all CRDs per contrast/condition. 
+Do more differential CRDs have more differential OCRs?
+```{r plot_OCR_vs_CRD_differential_stats, results='asis'}
+#| echo: false
+#| fig-height: 8
+#| fig-width: 10
+
+# #| eval: false
+OCR.level.data.df <- 
+    all.CRD.differential.stats.df %>%
+    filter(contrast == 'AD_CERAD_withDLB') %>%
+    dplyr::rename('OCRs.value'=CRD.value)
+CRD.level.data.df <- 
+    all.differential.CRD.results.df %>% 
+    filter(contrast %in% c('AD_CERAD_withDLB-AD-Control', 'age-NA-NA')) %>% 
+    dplyr::rename('CRD.contrast'=contrast) %>%
+    select(-c(seqnames, start, end, width, strand, nPeaks, stats, nCRDs, p.value, p.adjust, sign)) %>%
+    pivot_longer(
+        c(log10.p.adjust, log10.p.value),
+        names_to='CRD.metric',
+        values_to='CRD.value'
+    ) %>% 
+    # mutate(CRD.metric=glue('{method} {CRD.metric}')) %>%
+    select(-c(CRD.sample.strategy))
+plot.df <- 
+    inner_join(
+        CRD.level.data.df,
+        OCR.level.data.df,
+        by=
+            intersect(
+                colnames(CRD.level.data.df),
+                colnames(OCR.level.data.df)
+            )
+    )
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model'
+        # 'CRD.metric'
+    )
+plot.df %>% 
+    order_variable_for_plotting() %>% 
+    nest(plot.df=-all_of(c(nesting.vars))) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_jitter,
+                regression_fnc=lm,
+                y.var='OCRs.value',
+                x.var='CRD.value',
+                color.var='sample.strategy',
+                size=1, alpha=0.5,
+                # facet.col='OCR.metric', 
+                # facet.row=c('CRD.contrast'),
+                facet.row=c('metric', 'summary.stat'),
+                facet.col=c('CRD.contrast', 'CRD.metric'),
+                scales='free',
+                # legend.position='none',
+                axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+                axis.title=element_blank(),
+                plot.elements=
+                    list(
+                        geom_hline(yintercept=-log10(0.05), linetype='dashed', color='red', linewidth=0.2),
+                        geom_vline(xintercept=-log10(0.05), linetype='dashed', color='red', linewidth=0.2)
+                    ),
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=2,
+        output_var='figures',
+        tabset_vars=nesting.vars
+    )
+```
+
+# Quantile-Quantile Plots for CRD p-values across contrasts and conditions
+
+Does the cross-sample merging 
+```{r compute_pvalue_quantiles}
+#| eval: false
+
+CRD.pvalues.df <- 
+    all.differential.CRD.results.df %>% 
+    select(
+        CPM.cutoff, residual.model, CRD.sample.strategy, contrast, CRDID, detected.in.groups, method,
+        log10.p.adjust, log10.p.value
+    ) %>% 
+    # select(CPM.cutoff, residual.model, CRD.sample.strategy, contrast, CRDID, detected.in.groups, method, p.adjust, p.value) %>% 
+    pivot_longer(
+        c(log10.p.adjust, log10.p.value),
+        # c(p.adjust, p.value),
+        names_to='CRD.metric',
+        values_to='CRD.value'
+    )
+CRD.quantiles.df <- 
+    bind_rows(
+        CRD.pvalues.df %>% 
+            select(-c(detected.in.groups)) %>% 
+            mutate(detected.in.groups=CRD.sample.strategy),
+        CRD.pvalues.df %>% filter(CRD.sample.strategy == 'merged')
+    ) %>% 
+    group_by(across(-all_of(c('CRDID', 'CRD.value')))) %>%
+    summarize(
+        quantiles=
+            quantile(CRD.value, probs=seq(0, 1, 0.02)) %>% 
+            enframe(name='quantile') %>% 
+            mutate(quantile=fct_reorder(quantile, row_number())) %>% 
+            list()
+    ) %>%
+    ungroup() %>% 
+    unnest(quantiles)
+```
+
+```{r plot_CRD_p_quantiles, results='asis'}
+#| eval: false
+#| echo: false
+#| fig-height: 14
+#| fig-width: 10
+
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        # 'residual.model'
+        'residual.model', 'method', 'CRD.metric'
+    )
+CRD.quantiles.df %>% 
+    filter(CRD.sample.strategy == detected.in.groups) %>% 
+    select(-c(CRD.sample.strategy)) %>% 
+    order_variable_for_plotting() %>% 
+    # nest(plot.df=-all_of(c(nesting.vars))) %>% 
+    nest(freq.df=-all_of(c(nesting.vars))) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=make_pairplot,
+                color.colname='contrast',
+                group.colname='detected.in.groups',
+                value.colname='value',
+                linewidth=0.2,
+                text.size=7,
+                alpha=0.5,
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=2,
+        output_var='figures',
+        tabset_vars=nesting.vars
+    )
+```
+
+# Plot CRD features stratified by CRD detection set (AD/Control/Both)
+
+## Stratified CRD feature distributions
+
+Now we can plot the distributions of various CRD features across all CRDs, stratified by the merge origins.
+```{r plot_stratified_CRD_features, results='asis'}
+#| echo: false
+#| fig-height: 7
+#| fig-width: 12
+# #| eval: false
+
+# Now plot correlation of SVs across datasets
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model'
+        # 'AD.definition.column',
+    )
+# OCR.summary.stats.df %>% head(1) %>% t()
+# OCR.summary.stats.df %>% count(CRD.feature.type, feature, summary.stat)
+# OCR.summary.stats.df %>% count(sample.strategy, meanClusterSize, merging.level)
+OCR.summary.stats.df %>% 
+    filter(summary.stat != 'total') %>% 
+    filter(meanClusterSize == 'merged') %>% 
+    filter(sample.strategy == 'merged') %>% 
+    add_merge_origin_annotations() %>% 
+    mutate(detected.in.groups=str_remove_all(detected.in.groups, '.Samples')) %>% 
+    add_merge_origin_annotations() %>%
+    inner_join(
+        tribble(
+            ~feature,              ~feature.name,             
+            'gene.length',         'mean Assoc. Gene Length (bp)',
+            'peak.length',         'mean OCR Length (bp)',
+            'peak.distanceToTSS',  'mean OCR dist to TSS (bp)',
+            'CRD.length',          'CRD Size (bp)',
+            'CRD.nPeaks',          'CRD Size (# OCRs)',
+            'CRD.peak.coverage',   '% CRD Covered by OCRs',
+        ) %>% 
+        mutate(feature.name=fct_reorder(feature.name, row_number())),
+        by='feature'
+    ) %>% 
+    select(-c(feature, CRD.feature.type, summary.stat)) %>% 
+    order_variable_for_plotting() %>% 
+    nest(plot.df=-all_of(c(nesting.vars))) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_boxplot,
+                x.var='detected.in.groups',
+                y.var='CRD.value',
+                fill.var='detected.in.groups',
+                facet.group='feature.name', facet.nrow=2,
+                outliers=FALSE,
+                outlier.size=1,
+                legend.position='none',
+                axis.text.x=element_text(angle=45, hjust=1, vjust=1),
+                scales='free', independent='y',
+                y.scale.mode='m', y.axis.label.accuracy=0.01,
+                axis.title=element_blank(),
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=3,
+        output_var='figures',
+        tabset_vars=nesting.vars
+    )
+```
+
+## Stratified OCR-level differential stats
+
+```{r plot_stratified_OCR_differential_summaries, results='asis'}
+#| echo: false
+#| fig-height: 8
+#| fig-width: 10
+# #| eval: false
+
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model'
+    )
+# all.CRD.differential.stats.df %>% colnames()
+# all.CRD.differential.stats.df %>% count(sample.strategy, contrast, metric, summary.stat)
+all.CRD.differential.stats.df %>% 
+    filter(sample.strategy == 'merged') %>% 
+    add_merge_origin_annotations() %>% 
+    order_variable_for_plotting() %>% 
+    mutate(detected.in.groups=str_remove_all(detected.in.groups, '.Samples')) %>% 
+    nest(plot.df=-all_of(c(nesting.vars))) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_boxplot,
+                x.var='contrast',
+                y.var='CRD.value',
+                fill.var='detected.in.groups',
+                facet.row=c('metric', 'summary.stat'),
+                scales='free_y', independent='y',
+                plot.elements=list(FDR.line),
+                # scales='free_y', space='free_y', independent='y',
+                # legend.position='top',
+                # axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+                axis.title=element_blank(),
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=2,
+        output_var='figures',
+        tabset_vars=nesting.vars
+    )
+```
+
+## Stratified CRD-level differential stats
+
+```{r plot_stratified_CRD_differential_summaries, results='asis'}
+#| echo: false
+#| fig-height: 10
+#| fig-width: 10
+# #| eval: false
+
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model'
+        # 'AD.definition.column',
+    )
+# all.differential.CRD.results.df %>% colnames()
+# all.differential.CRD.results.df %>% count(CRD.sample.strategy, contrast, method)
+all.differential.CRD.results.df %>% 
+    mutate(detected.in.groups=str_remove_all(detected.in.groups, '.Samples')) %>% 
+    filter(CRD.sample.strategy == 'merged') %>% 
+    pivot_longer(
+        c(p.adjust, p.value, log10.p.adjust, log10.p.value),
+        names_to='metric',
+        values_to='value'
+    ) %>% 
+    filter(
+        metric %in%
+            c(
+                # p.value,
+                'log10.p.value',
+                # p.adjust,
+                'log10.p.adjust'
+            )
+    ) %>% 
+    order_variable_for_plotting() %>% 
+    nest(plot.df=-all_of(c(nesting.vars))) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_boxplot,
+                x.var='detected.in.groups',
+                y.var='value',
+                fill.var='detected.in.groups',
+                facet.col='contrast', facet.row=c('method', 'metric'),
+                scales='free_y',
+                legend.position='none',
+                plot.elements=list(FDR.line),
+                axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+                axis.title=element_blank(),
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=2,
+        output_var='figures',
+        tabset_vars=nesting.vars
+    )
+```
+
+## Stratified OCR ~ CRD differential Comparison
+
+```{r plot_stratified_OCR_vs_CRD_differential_stats, results='asis'}
+#| echo: false
+#| fig-height: 8
+#| fig-width: 10
+#| eval: false
+
+OCR.level.data.df <- 
+    all.CRD.differential.stats.df %>%
+    filter(contrast == 'AD_CERAD_withDLB') %>%
+    dplyr::rename('OCRs.value'=CRD.value)
+CRD.level.data.df <- 
+    all.differential.CRD.results.df %>% 
+    filter(contrast %in% c('AD_CERAD_withDLB-AD-Control', 'age-NA-NA')) %>% 
+    dplyr::rename('CRD.contrast'=contrast) %>%
+    select(-c(seqnames, start, end, width, strand, nPeaks, stats, nCRDs, p.value, p.adjust, sign)) %>%
+    pivot_longer(
+        c(log10.p.adjust, log10.p.value),
+        names_to='CRD.metric',
+        values_to='CRD.value'
+    ) %>% 
+    # mutate(CRD.metric=glue('{method} {CRD.metric}')) %>%
+    select(-c(CRD.sample.strategy))
+plot.df <- 
+    inner_join(
+        CRD.level.data.df,
+        OCR.level.data.df,
+        by=
+            intersect(
+                colnames(CRD.level.data.df),
+                colnames(OCR.level.data.df)
+            )
+    ) %>%
+    filter(sample.strategy == 'merged')
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model',
+        'CRD.metric'
+    )
+plot.df %>% 
+    order_variable_for_plotting() %>% 
+    nest(plot.df=-all_of(c(nesting.vars))) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_jitter,
+                regression_fnc=lm,
+                y.var='OCRs.value',
+                x.var='CRD.value',
+                color.var='detected.in.groups',
+                size=1, alpha=0.5,
+                # facet.col='OCR.metric', 
+                # facet.row=c('CRD.contrast'),
+                facet.row=c('metric', 'summary.stat'),
+                facet.col=c('CRD.contrast', 'CRD.metric'),
+                scales='free',
+                # legend.position='none',
+                axis.text.x=element_text(angle=45, vjust=1, hjust=1),
+                axis.title=element_blank(),
+                plot.elements=
+                    list(
+                        geom_hline(yintercept=-log10(0.05), linetype='dashed', color='red', linewidth=0.2),
+                        geom_vline(xintercept=-log10(0.05), linetype='dashed', color='red', linewidth=0.2)
+                    ),
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=2,
+        output_var='figures',
+        tabset_vars=nesting.vars
+    )
+```
+
+
+

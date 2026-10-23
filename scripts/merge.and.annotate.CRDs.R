@@ -158,7 +158,7 @@ tribble(
 ############################################################
 # Compute summary statistics + features for each CRD across all sets/conditions
 ############################################################
-# Load Differential OCR data
+# Load OCR metadata
 all.peak.metadata.df <- 
     load_all_peak_metadata() %>%
     nest(peak.metadata=-c(CPM.cutoff))
