@@ -27,7 +27,7 @@ RELEVANT_METADATA_COLUMNS <-
 # NULL means convert to integer
 ALL_VARIABLE_ORDERINGS <- 
     list(
-        age=NULL,
+        # age=NULL,
         CDR_3levels=
             c(
                 'Healthy',
@@ -130,16 +130,20 @@ DECORATE_HYPER_PARAMS_DF <-
     )
 DIFFERENTIAL_DECORATE_HYPER_PARAMS_DF <- 
     tribble(
-        ~contrast.variable, ~contrast.denominator,  ~contrast.numerator,
-        'AD_CERAD_withDLB', 'Control',              'AD', 
-        'Braak_3levels',    'Braak_Max2',           'Braak_3to4',
-        'Braak_3levels',    'Braak_3to4',           'Braak_5plus',
-        'Braak_3levels',    'Braak_Max2',           'Braak_5plus',
-        'CDR_3levels',      'Healthy',              'MCI',
-        'CDR_3levels',      'Healthy',              'Dementia',
-        'CDR_3levels',      'MCI',                  'Dementia',
-        'Sex',              'Female',               'Male',
-        'Biobank',          'MSBB',                 'Rush',
+        ~contrast.variable, ~contrast.denominator, ~contrast.numerator,
+        'AD_CERAD_withDLB', 'Control',             'AD', 
+        # 'Braak_3levels',    'Braak_Max2',          'Braak_3to4',
+        'Braak_3levels',    'Braak_3to4',          'Braak_5plus',
+        'Braak_3levels',    'Braak_Max2',          'Braak_5plus',
+        # 'CDR_3levels',      'Healthy',             'MCI',
+        'CDR_3levels',      'Healthy',             'Dementia',
+        # 'CDR_3levels',      'MCI',                 'Dementia',
+        'sex',              'Female',              'Male',
+        'Biobank',          'MSBB',                'Rush',
+        # 'AD_CERAD_withDLB', NA,                    NA,
+        # 'Braak_3levels',    NA,                    NA,
+        # 'CDR_3levels',      NA,                    NA,
+        'age',              NA,                    NA,
     ) %>% 
     mutate(contrast=glue('{contrast.variable}-{contrast.numerator}-{contrast.denominator}'))
 

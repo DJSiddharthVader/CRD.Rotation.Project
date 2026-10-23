@@ -588,28 +588,40 @@ compute_differential_CRD_results <- function(
     peak.residuals.mx,
     CRDs,
     contrast.indicator,
-    min.CRD.size,
+    contrast.type,
     method.corr,
     test.methods,
     ...) {
+    if (contrast.type == 'continuous') { 
+        sample.groups <- as.numeric(contrast.indicator[[1]])
+    } else {
+        sample.groups <- as.integer(contrast.indicator[[1]])
+    }
     # For each CRD
     CRDs %>% 
     mutate(nPeaks=pmap_int(.l=list(PeakList), .f=nrow)) %>% 
-    # Remvoe if CRD is too small
-    filter(nPeaks >= min.CRD.size) %>% 
+    # pointless to test any CRDs with only 2 peaks
+    filter(nPeaks > 2) %>% 
     # Try every test method for every CRD
     cross_join(tibble(method=test.methods)) %>% 
+    {
+        if (contrast.type == 'continuous') {
+            filter(., method != 'Box')
+        } else {
+            .
+        }
+    } %>% 
     # Compute CRD testing results i.e. compare peak abundance matrices between the two contrast levels
     # using the peaks specified by each CRD
     # turn results into tidy tibble
     mutate(
         test.results=
+            # pmap_dfr(
             future_pmap_dfr(
                 .l=.,
-                # .progress=TRUE,
-                # only compare samples applicable to the specified contrast
-                contrast.peak.residuals.mx=peak.residuals.mx[, rownames(contrast.indicator)],
-                sample.groups=as.integer(contrast.indicator[[1]]),
+                .progress=TRUE,
+                contrast.peak.residuals.mx=peak.residuals.mx,
+                sample.groups=contrast.indicator,
                 method.corr=method.corr,
                 .f=
                     function(
@@ -619,7 +631,10 @@ compute_differential_CRD_results <- function(
                         sample.groups,
                         method.corr,
                         ...) {
-                        corrMatrix.test( 
+                        # print(dim(t(contrast.peak.residuals.mx[PeakList$PeakID, ])))
+                        # print(length(sample.groups))
+                        # print(method)
+                        corrMatrix.test(
                             Y=t(contrast.peak.residuals.mx[PeakList$PeakID, ]),
                             method=method,
                             group=sample.groups,
@@ -646,9 +661,9 @@ compute_all_differential_CRD_results <- function(
     SVs.filepath, SVs.included,
     PeakList.filepath, Locations.filepath,
     contrast.variable, contrast.numerator, contrast.denominator,
-    # test.methods=c('Delaneau', 'deltaSLE', 'Box'),
     ...){
     # paste0('row.index=1; ', paste0(colnames(tmp), '=tmp$', colnames(tmp), '[[row.index]]', collapse='; '))
+    # row.index=1; CPM.cutoff=tmp$CPM.cutoff[[row.index]]; residual.model=tmp$residual.model[[row.index]]; AD.definition.column=tmp$AD.definition.column[[row.index]]; sample.strategy=tmp$sample.strategy[[row.index]]; z.score.counts=tmp$z.score.counts[[row.index]]; n.SVs=tmp$n.SVs[[row.index]]; SVs.included=tmp$SVs.included[[row.index]]; adjacentCount=tmp$adjacentCount[[row.index]]; method.corr=tmp$method.corr[[row.index]]; clusterMethod=tmp$clusterMethod[[row.index]]; filterMetric=tmp$filterMetric[[row.index]]; filterMetricCutoff=tmp$filterMetricCutoff[[row.index]]; jaccardCutoff=tmp$jaccardCutoff[[row.index]]; meanClusterSize=tmp$meanClusterSize[[row.index]]; is.decorate.filtered=tmp$is.decorate.filtered[[row.index]]; merging.level=tmp$merging.level[[row.index]]; Locations.filepath=tmp$Locations.filepath[[row.index]]; PeakList.filepath=tmp$PeakList.filepath[[row.index]]; residuals.filepath=tmp$residuals.filepath[[row.index]]; coords.filepath=tmp$coords.filepath[[row.index]]; SVs.filepath=tmp$SVs.filepath[[row.index]]; contrast.variable=tmp$contrast.variable[[row.index]]; contrast.denominator=tmp$contrast.denominator[[row.index]]; contrast.numerator=tmp$contrast.numerator[[row.index]]; contrast=tmp$contrast[[row.index]]; results_dir=tmp$results_dir[[row.index]]; results_file=tmp$results_file[[row.index]]
     # Load ATAC data
     peak.data <- 
         subset_peak_data(
@@ -678,34 +693,72 @@ compute_all_differential_CRD_results <- function(
         stop(glue('SVs.included must be an integer, passed: {SVs.included}'))
     }
     # Only keep samples with valid values for the contrast I cam comparing
+    contrast.nlevels <- 
+        peak.data$sample.metadata %>%
+        filter(SampleID %in% colnames(peak.residuals.mx)) %>% 
+        pull(!!sym(contrast.variable)) %>%
+        unique() %>%
+        length()
+    # Set up variable along which to compare samples individual OCRs for each CRD
     contrast.indicator <- 
         peak.data$sample.metadata %>%
-        filter(!!sym(contrast.variable) %in% c(contrast.numerator, contrast.denominator)) %>%
         filter(SampleID %in% colnames(peak.residuals.mx)) %>% 
-        mutate(
-            !!contrast.variable := 
-                factor(
-                    !!sym(contrast.variable),
-                    levels=c(contrast.denominator, contrast.numerator)
+        # factorize contrast variable if not continuous 
+        {
+            if (length(unique(.[[contrast.variable]])) == 2) {
+                filter(
+                    .,
+                    !!sym(contrast.variable) %in% c(contrast.numerator, contrast.denominator)
+                ) %>%
+                mutate(
+                    !!contrast.variable := 
+                        factor(
+                            !!sym(contrast.variable),
+                            levels=c(contrast.denominator, contrast.numerator)
+                        )
                 )
-        ) %>%
+            } else if (contrast.variable %in% names(ALL_VARIABLE_ORDERINGS)) {
+                mutate(
+                    .,
+                    !!contrast.variable := 
+                        factor(
+                            !!sym(contrast.variable),
+                            levels=ALL_VARIABLE_ORDERINGS[[contrast.variable]]
+                        )
+                ) %>% 
+                filter(!is.na(!!sym(contrast.variable)))
+            } else {
+                .
+            }
+        } %>% 
         select(all_of(c('SampleID', contrast.variable))) %>%
         as.data.frame() %>%
         column_to_rownames('SampleID')
+    if (contrast.nlevels  == 2 | contrast.variable %in% names(ALL_VARIABLE_ORDERINGS)) {
+        contrast.type <- 'discrete'
+    } else {
+        contrast.type <- 'continuous'
+    }
+    samples.to.keep <- 
+        intersect(
+            rownames(contrast.indicator),
+            colnames(peak.residuals.mx)
+        )
     # Load CRDs to compare
     CRDs <- 
         combine_CRD_Locations_and_PeakLists(
             PeakList.filepath,
             Locations.filepath
         )
+    message('Calculating differential test stats for each CRD...')
     # Now use custom wrapper to compute differential CRD stats with decorate
     compute_differential_CRD_results(
-        peak.residuals.mx=peak.residuals.mx,
+        peak.residuals.mx=peak.residuals.mx[, samples.to.keep],
+        contrast.indicator=contrast.indicator[samples.to.keep, ],
         CRDs=CRDs,
-        contrast.indicator=contrast.indicator,
+        contrast.type=contrast.type,
         ...
         # test.methods=test.methods,
-        # min.CRD.size=min.CRD.size,
         # method.corr=method.corr,
     )
 }

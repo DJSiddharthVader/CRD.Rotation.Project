@@ -32,7 +32,6 @@ all.ATAC.and.SV.datasets.df <-
 all.input.paramater.combinations.df <- 
     # CRDs to test for differential signal
     list_all_results_files_in_set(set.name='merged.CRDs') %>% 
-    filter(sample.strategy %in% c('All.Samples', 'merged')) %>% 
     # Match to relevant set of peaks 
     inner_join(
         all.ATAC.and.SV.datasets.df,
@@ -45,15 +44,13 @@ all.input.paramater.combinations.df <-
             )
     ) %>% 
     filter(CPM.cutoff == '3CPM') %>%
-    filter(n.SVs == 14) %>%
+    filter(n.SVs == NUM_SVS_TO_GENERATE) %>%
     filter(z.score.counts) %>%
     filter(SVs.included == NUM_SVS_TO_REMOVE) %>% 
-    filter(is.decorate.filtered == 'filtered') %>%
-    filter(meanClusterSize == 'merged') %>% 
-    filter(sample.strategy %in% c('merged', 'All.Samples')) %>% 
-    add_column(min.CRD.size=3) %>% 
+    filter(is.decorate.filtered == 'filtered') %>% filter(meanClusterSize == 'merged') %>% 
     # differential contrasts to test with decorate 
-    cross_join(DIFFERENTIAL_DECORATE_HYPER_PARAMS_DF %>% head(1))
+    # cross_join(DIFFERENTIAL_DECORATE_HYPER_PARAMS_DF %>% head(1))
+    cross_join(DIFFERENTIAL_DECORATE_HYPER_PARAMS_DF)
 
 ############################################################
 # Generate Differential CRD results
@@ -78,20 +75,19 @@ all.input.paramater.combinations.df %>%
                 glue('jaccardCutoff_{jaccardCutoff}'),
                 glue('meanClusterSize_{meanClusterSize}'),
                 glue('is.decorate.filtered_{is.decorate.filtered}'),
-                glue('min.CRD.size_{min.CRD.size}'),
                 glue('contrast_{contrast}')
             ),
         results_file=file.path(results_dir, 'differential.CRD.results.tsv')
     ) %>% 
+    # future_pmap(
     pmap(
         .l=.,
         .f=check_cached_results,
         # force_redo=TRUE,
-        return_data=TRUE,
+        return_data=FALSE,
         results_fnc=compute_all_differential_CRD_results,
         all.sample.metadata=all.sample.metadata,
-        test.methods=c('Delaneau', 'deltaSLE', 'Box'),
-        # p=progressor(label='decorate runs', steps=nrow({.})),
+        test.methods=c('Delaneau', 'deltaSLE', 'Box.permute', 'Box'),
         .progress=TRUE
     ) 
 
