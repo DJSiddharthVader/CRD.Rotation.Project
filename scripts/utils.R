@@ -189,107 +189,45 @@ order_variable_for_plotting <- function(
     return(df)
 }
 
-############################################################
-# Loading ATAC Data
-############################################################
-load_sample_metadata <- function(...){
-    check_cached_results(
-        ...,
-        results_file=SAMPLE_METADATA_TSV_FILEPATH,
-        results_fnc=
-            function(){
-                SAMPLE_METADATA_RDS_FILEPATH %>% 
-                readRDS() %>% 
-                rownames_to_column('SampleID') %>% 
-                as_tibble() %>% 
-                select(
-                    SampleID,
-                    # Sample_ID,
-                    Person_ID,
-                    sex,
-                    age,
-                    RACE,
-                    race_color,
-                    Biobank,
-                    readCountInfo_Total,
-                    finalReadCount,
-                    lib.size,
-                    ctcf_fos,
-                    mergingDesigns,
-                    PrimCauseDeath,
-                    PMI_mins,
-                    Sepsis_Dx,
-                    Secondary_Dx,
-                    Parkinson_Dx,
-                    # DLB_Dx,
-                    # Dementia_MCI_CDR,
-                    # CDR_Combined,
-                    # Braak_Score,
-                    # CERAD_Combined,
-                    ApoE_score,
-                    ApoE4count,
-                    AD_CERAD_withDLB,
-                    Braak_3levels,
-                    CDR_3levels,
-                    Final.Dx
-                )
-            }
-    )
-}
-
-list_all_ATAC_residual_sets <- function(){
-    RESIDUALS_DIR %>%
-    list.files(full.names=TRUE) %>%
-    tibble(residuals.filepath=.) %>%
-    mutate(info=residuals.filepath %>% basename()) %>% 
-    filter(str_detect(info, '^Resid_.*.RDs')) %>% 
-    mutate(info=info %>% str_remove('.RDs$')) %>% 
-    separate_wider_delim(
-        info,
-        delim='_',
-        names=c(NA, 'residual.model', NA, NA, 'CPM.cutoff', NA, NA),
-        too_few='align_start',
-        too_many='merge'
+load_all_msigdb_annotations <- function(force_redo=FALSE){
+    file.path(INPUT_DATA_DIR, "MSigDB.lists") %>%
+    list.files(pattern='.gmt$', full.names=TRUE) %>%
+    tibble(filepath=.) %>%
+    mutate(annotation.souce=basename(str_remove(filepath, '.gmt$'))) %>% 
+    mutate(
+        annotations=
+            pmap(
+                .l=list(filepath),
+                .f=
+                    function(filepath, ...) {
+                        # con <- file(filepath, "r")
+                        filepath %>% 
+                        readLines(warn=FALSE) %>%
+                        pmap(
+                            .l=list(.),
+                            .f=
+                                function(line, ...){
+                                    split.line <-
+                                        line %>% 
+                                        stringr::str_split("\\\t") %>% 
+                                        unlist(recursive=FALSE)
+                                    tibble_row(
+                                        term.name=split.line[1],
+                                        term.genes=list(split.line[3:length(split.line)])
+                                    )
+                                }
+                        ) %>%
+                        bind_rows()
+                    }
+            )
     ) %>%
-    filter(str_detect(CPM.cutoff, 'CPM'))
+    unnest(annotations) %>%
+    select(-c(filepath))
 }
 
-list_all_ATAC_coordinates_sets <- function(){
-    RESIDUALS_DIR %>%
-    list.files(full.names=TRUE) %>%
-    tibble(coords.filepath=.) %>%
-    mutate(info=coords.filepath %>% basename()) %>% 
-    filter(str_detect(info, '^expObjNonLow_ATACseq_.*.RDs')) %>% 
-    mutate(info=info %>% str_remove('.RDs$')) %>% 
-    separate_wider_delim(
-        info,
-        delim='_',
-        names=c(NA, NA, 'dims', 'CPM.cutoff'),
-        too_few='align_start',
-        too_many='merge'
-    ) %>%
-    filter(str_detect(CPM.cutoff, 'CPM')) %>%
-    select(-c(dims))
-}
-
-load_peak_locations <- function(coords.filepath, ...) {
-    coords.filepath %>% 
-    readRDS() %>% 
-    {.$genes} %>% 
-    as.data.frame() %>% 
-    makeGRangesFromDataFrame()
-}
-
-list_all_ATAC_datasets <- function(){
-    # First list residual ATAC-seq count matrices that can be used to annotate CRDs
-    list_all_ATAC_residual_sets() %>% 
-    # get data specifying peak coordinates for each set of residuals
-    left_join(
-        list_all_ATAC_coordinates_sets(),
-        by=join_by(CPM.cutoff)
-    )
-}
-
+############################################################
+# Load data for all OCRs
+############################################################
 load_all_peak_metadata <- function(
     CPM.cutoff='3CPM',
     ...){
@@ -441,6 +379,107 @@ load_all_differential_OCR_results <- function(...){
 }
 
 ############################################################
+# Loading ATAC Data
+############################################################
+load_sample_metadata <- function(...){
+    check_cached_results(
+        ...,
+        results_file=SAMPLE_METADATA_TSV_FILEPATH,
+        results_fnc=
+            function(){
+                SAMPLE_METADATA_RDS_FILEPATH %>% 
+                readRDS() %>% 
+                rownames_to_column('SampleID') %>% 
+                as_tibble() %>% 
+                select(
+                    SampleID,
+                    # Sample_ID,
+                    Person_ID,
+                    sex,
+                    age,
+                    RACE,
+                    race_color,
+                    Biobank,
+                    readCountInfo_Total,
+                    finalReadCount,
+                    lib.size,
+                    ctcf_fos,
+                    mergingDesigns,
+                    PrimCauseDeath,
+                    PMI_mins,
+                    Sepsis_Dx,
+                    Secondary_Dx,
+                    Parkinson_Dx,
+                    # DLB_Dx,
+                    # Dementia_MCI_CDR,
+                    # CDR_Combined,
+                    # Braak_Score,
+                    # CERAD_Combined,
+                    ApoE_score,
+                    ApoE4count,
+                    AD_CERAD_withDLB,
+                    Braak_3levels,
+                    CDR_3levels,
+                    Final.Dx
+                )
+            }
+    )
+}
+
+list_all_ATAC_residual_sets <- function(){
+    RESIDUALS_DIR %>%
+    list.files(full.names=TRUE) %>%
+    tibble(residuals.filepath=.) %>%
+    mutate(info=residuals.filepath %>% basename()) %>% 
+    filter(str_detect(info, '^Resid_.*.RDs')) %>% 
+    mutate(info=info %>% str_remove('.RDs$')) %>% 
+    separate_wider_delim(
+        info,
+        delim='_',
+        names=c(NA, 'residual.model', NA, NA, 'CPM.cutoff', NA, NA),
+        too_few='align_start',
+        too_many='merge'
+    ) %>%
+    filter(str_detect(CPM.cutoff, 'CPM'))
+}
+
+list_all_ATAC_coordinates_sets <- function(){
+    RESIDUALS_DIR %>%
+    list.files(full.names=TRUE) %>%
+    tibble(coords.filepath=.) %>%
+    mutate(info=coords.filepath %>% basename()) %>% 
+    filter(str_detect(info, '^expObjNonLow_ATACseq_.*.RDs')) %>% 
+    mutate(info=info %>% str_remove('.RDs$')) %>% 
+    separate_wider_delim(
+        info,
+        delim='_',
+        names=c(NA, NA, 'dims', 'CPM.cutoff'),
+        too_few='align_start',
+        too_many='merge'
+    ) %>%
+    filter(str_detect(CPM.cutoff, 'CPM')) %>%
+    select(-c(dims))
+}
+
+load_peak_locations <- function(coords.filepath, ...) {
+    coords.filepath %>% 
+    readRDS() %>% 
+    {.$genes} %>% 
+    as.data.frame() %>% 
+    makeGRangesFromDataFrame()
+}
+
+list_all_ATAC_datasets <- function(){
+    # First list residual ATAC-seq count matrices that can be used to annotate CRDs
+    list_all_ATAC_residual_sets() %>% 
+    # get data specifying peak coordinates for each set of residuals
+    left_join(
+        list_all_ATAC_coordinates_sets(),
+        by=join_by(CPM.cutoff)
+    )
+}
+
+############################################################
 # Listing all results files + metadta prefedined named sets of results 
 ############################################################
 list_all_results_files_in_set <- function(
@@ -502,43 +541,5 @@ list_all_results_files_in_set <- function(
     } else {
         stop(glue('Invalid results set name: {set.name}'))
     }
-}
-
-############################################################
-# Load all CRDs, specified as CRDID <-> PeakID mappings
-############################################################
-load_all_CRDs_as_Peak_lists <- function() {
-    decorate.params.list <- DECORATE_HYPER_PARAMS_DF %>% colnames() %>% {.[. != 'meanClusterSize']}
-    list_all_results_files_in_set(set.name='CRD.PeakLists') %>% 
-    # only load CRDs with chosen SVs regressed out 
-    # filter(CPM.cutoff == '3CPM') %>% 
-    # filter(z.score.counts) %>% 
-    # filter(n.SVs == NUM_SVS_TO_GENERATE) %>% 
-    # filter(SVs.included == NUM_SVS_TO_REMOVE) %>% 
-    # filter(sample.strategy != 'No.Others') %>% 
-    mutate(decorate.params=glue(paste0('{', decorate.params.list, '}', collapse='+'))) %>% 
-    mutate(
-        CRDs=
-            future_pmap(
-                .l=list(CRDs.filepath),
-                .f=~ read_tsv(.x, show_col_types=FALSE),
-                .progress=TRUE
-            )
-    ) %>%
-    unnest(CRDs) %>%
-    nest(CRDs=c(chr, PeakID, CRDID)) %>% 
-    arrange(
-        CPM.cutoff,
-        residual.model,
-        decorate.params, meanClusterSize,
-        AD.definition.column, sample.strategy,
-        is.decorate.filtered
-    ) %>% 
-    select(
-        CPM.cutoff, residual.model, AD.definition.column, sample.strategy,
-        z.score.counts, n.SVs, SVs.included,
-        decorate.params, meanClusterSize, is.decorate.filtered,
-        CRDs
-    )
 }
 
