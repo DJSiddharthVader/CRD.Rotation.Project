@@ -154,17 +154,25 @@ residualize_out_specified_SVs <- function(
 
 residualize_SVs <- function(
     SVs.included,
-    SVs.df,
+    SVs.df=NULL,
+    SVs.filepath=NULL,
     residuals.mx){
+    if (is.null(SVs.df)) {
+        SVs.df <- 
+            SVs.filepath %>%
+            read_tsv(show_col_types=FALSE) %>%
+            as.data.frame() %>%
+            column_to_rownames('SampleID')
+    }
     if (SVs.included == 0) {
-        message('Not regressing out any SVs before running decorate')
+        message('Not regressing out any SVs from peak matrix')
         residuals.mx
     } else if (SVs.included > 0) { 
         SV.variables <- 
             SVs.df %>% colnames() %>% grep('^SV', ., value=TRUE)
         SVs.included <- 
             min(SVs.included, length(SV.variables))
-        message(glue('Regressing out {SVs.included} SVs before running decorate'))
+        message(glue('Regressing out {SVs.included} SVs from peak matrix'))
         residualize_out_specified_SVs(
             peak.residuals.mx=residuals.mx,
             SVs.df=SVs.df,
@@ -174,6 +182,8 @@ residualize_SVs <- function(
         stop(glue('Invalid arg to SVs.included: {SVs.included}'))
     }
 }
+
+wrap_residualize_SVs <- function()
 
 ############################################################
 # Aanalyze SV-residualized matrices

@@ -271,24 +271,12 @@ run_decorate_pipeline <- function(
             sample.strategy=sample.strategy
         )
     # Load SVs to residualize out 
-    if (SVs.included > 0) {
-        SVs.df <- 
-            SVs.filepath %>%
-            read_tsv(show_col_types=FALSE) %>%
-            as.data.frame() %>%
-            column_to_rownames('SampleID')
-        peak.residuals.mx <-
-            residualize_SVs(
-                SVs.df=SVs.df,
-                residuals.mx=peak.data$residuals,
-                SVs.included=SVs.included
-            )
-    } else  if (SVs.included == 0) {
-        peak.residuals.mx <- 
-            peak.data$residuals
-    } else {
-        stop(glue('SVs.included must be an integer, passed: {SVs.included}'))
-    }
+    peak.residuals.mx <-
+        residualize_SVs(
+            SVs.filepath=SVs.filepath,
+            residuals.mx=peak.data$residuals,
+            SVs.included=SVs.included
+        )
     results.obj <- 
         generate_peak_cluster_with_decorate(
             peak.residuals.mx=peak.residuals.mx,
@@ -674,24 +662,12 @@ compute_all_differential_CRD_results <- function(
             sample.strategy='All.Samples'
         )
     # Load SVs to residualize out 
-    if (SVs.included > 0) {
-        SVs.df <- 
-            SVs.filepath %>%
-            read_tsv(show_col_types=FALSE) %>%
-            as.data.frame() %>%
-            column_to_rownames('SampleID')
-        peak.residuals.mx <-
-            residualize_SVs(
-                SVs.df=SVs.df,
-                residuals.mx=peak.data$residuals,
-                SVs.included=SVs.included
-            ) 
-    } else  if (SVs.included == 0) {
-        peak.residuals.mx <- 
-            peak.data$residuals
-    } else {
-        stop(glue('SVs.included must be an integer, passed: {SVs.included}'))
-    }
+    peak.residuals.mx <-
+        residualize_SVs(
+            SVs.filepath=SVs.filepath,
+            residuals.mx=peak.data$residuals,
+            SVs.included=SVs.included
+        ) 
     # Only keep samples with valid values for the contrast I cam comparing
     contrast.nlevels <- 
         peak.data$sample.metadata %>%
@@ -761,5 +737,54 @@ compute_all_differential_CRD_results <- function(
         # test.methods=test.methods,
         # method.corr=method.corr,
     )
+}
+
+############################################################
+# Functional Enrichment CRD Analysis
+############################################################
+compute_enrichment_of_CRD_peak_genes <- function(
+    PeakList.filepath,
+    Locations.filepath,
+    ...){
+    # Load CRDs to compare
+    CRDs <- 
+        combine_CRD_Locations_and_PeakLists(
+            PeakList.filepath,
+            Locations.filepath
+        )
+    CRDs %>% 
+    mutate(nPeaks=pmap_int(.l=list(PeakList), .f=nrow)) %>% 
+    # pointless to test any CRDs with only 2 peaks
+    filter(nPeaks > 2) %>% 
+    # test all GO Terms against all CRDs with a fisher test
+    cross_join(
+    ) %>% 
+    # Compute CRD testing results i.e. compare peak abundance matrices between the two contrast levels
+    # using the peaks specified by each CRD
+    # turn results into tidy tibble
+    mutate(
+        fisher.test.results=
+            # pmap_dfr(
+            future_pmap_dfr(
+                .l=.,
+                # .progress=TRUE,
+                all.peak.annotations.df=all.peak.annotations.df,
+                # all.peak.metadata=all.peak.metadata,
+                # gene.function.annotations.df=gene.function.annotations.df,
+                .f=
+                    function(PeakList, all.peak.annotations.df, ...) {
+                        PeakList %>%
+                        inner_join(
+                            all.peak.annotations.df,
+                            by=join_by(PeakID)
+                        ) %>% 
+                        group_by() %>%
+
+                        fisher.test() %>% tidy()
+                    }
+            )
+    ) %>% 
+    unnest(fisher.test.results) %>%
+    select(-c(PeakList))
 }
 
