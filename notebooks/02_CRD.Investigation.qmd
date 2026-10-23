@@ -7,8 +7,6 @@ metadata-files:
   - _report_options.yml
 ---
 
-{{< include _imports.qmd >}}
-{{< include _load_sample_metadata.qmd >}}
 ```{r notebook opts}
 FORCE_REDO <- FALSE
 # FORCE_REDO <- TRUE
@@ -20,36 +18,9 @@ results_filter_fnc <- function(df) {
     filter(SVs.included == NUM_SVS_TO_REMOVE)
 }
 ```
-Load CRD features + summary stats over OCRs per CRD
-```{r load_CRD_features}
-all.CRD.features.df <- 
-    check_cached_results(
-        results_file=ALL_CRD_STATS_TSV_FILEPATH,
-        force_redo=FORCE_REDO,
-        results_fnc=
-            function() {
-                list_all_results_files_in_set(set.name='CRD.stats') %>% 
-                results_filter_fnc() %>% 
-                mutate(
-                    CRD.stats=
-                        future_pmap(
-                            .l=list(filepath),
-                            .progress=TRUE,
-                            .f=read_tsv,
-                            show_col_types=FALSE
-                        )
-                ) %>%
-                unnest(CRD.stats)
-            }
-    ) %>% 
-    select(
-        CPM.cutoff, residual.model, 
-        # z.score.counts, n.SVs, SVs.included,
-        is.decorate.filtered,
-        AD.definition.column, sample.strategy, meanClusterSize, merging.level, 
-        CRDID, CRD.feature.type, CRD.feature, CRD.value
-    )
-```
+{{< include _imports.qmd >}}
+{{< include _load_sample_metadata.qmd >}}
+{{< include _load_CRD_features.qmd >}}
 
 # Total CRD Size and Coverage
 
@@ -196,70 +167,6 @@ OCR.summary.stats.df %>%
     ) %>% 
     order_variable_for_plotting() %>% 
     nest(plot.df=-all_of(c(nesting.vars, 'y.scale.mode', 'y.axis.label.accuracy'))) %>% 
-    mutate(
-        figures=
-            pmap(
-                .l=.,
-                .f=plot_boxplot,
-                x.var='meanClusterSize',
-                y.var='CRD.value',
-                fill.var='sample.strategy',
-                facet.row=c('feature.name', 'summary.stat'),
-                scales='free_y',
-                # axis.text.x=element_text(angle=45, vjust=1, hjust=1),
-                axis.title=element_blank(),
-                .progress=TRUE
-            )
-    ) %>% 
-    custom_render_tabset(
-        starting.hlevel=3,
-        output_var='figures',
-        tabset_vars=nesting.vars
-    )
-```
-
-## OCR Size Dynamics
-
-```{r plot_CRD_densities, results='asis'}
-#| echo: false
-#| fig-height: 4
-#| fig-width: 6
-
-# Now plot correlation of SVs across datasets
-nesting.vars <- 
-    c(
-        'CPM.cutoff',
-        'residual.model'
-        # 'feature'
-        # 'AD.definition.column',
-    )
-OCR.summary.stats.df %>% 
-                # x.var='meanClusterSize',
-                # y.var='CRD.value',
-                # fill.var='sample.strategy',
-                # facet.row=c('feature.name', 'summary.stat'),
-    filter(
-        CRD.feature %in% 
-            c(
-                CRD.length,        
-                CRD.nPeaks,        
-                `peak.length-total`
-            )
-    ) %>% 
-    # filter(CRD.feature.type == 'CRD.stats') %>% 
-    # pivot_longer(
-    #     names_from=
-    #         c(
-    #             CRD.length,        
-    #             CRD.nPeaks,        
-    #             `peak.length-total`,
-    #             CRD.peak.coverage 
-    #         ),
-    #     values_from=CRD.value
-    # ) %>% 
-    order_variable_for_plotting() %>% 
-    # nest(plot.df=-all_of(c(nesting.vars, 'y.scale.mode', 'y.axis.label.accuracy'))) %>% 
-    nest(plot.df=-all_of(c(nesting.vars))) %>% 
     mutate(
         figures=
             pmap(

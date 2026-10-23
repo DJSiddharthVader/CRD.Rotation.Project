@@ -85,7 +85,7 @@ Load all SVs
 ```{r load_SV_data}
 all.SVs.df <- 
     check_cached_results(
-        results_file=file.path(NOTEBOOK_CACHE_DIR, 'all.SV.data.rds'),
+        results_file=ALL_SVS_RDS_FILEPATH,
         force_redo=FORCE_REDO,
         # force_redo=TRUE,
         results_fnc=
@@ -203,7 +203,7 @@ compute_all_SV_correlations <- function(all.SVs.df){
 }
 SV.correlations.df <- 
     check_cached_results(
-        results_file=file.path(NOTEBOOK_CACHE_DIR, 'all.SV.data.tsv'),
+        results_file=ALL_SV_CORRELATIONS_TSV_FILEPATH,
         force_redo=FORCE_REDO,
         # force_redo=TRUE,
         results_fnc=compute_all_SV_correlations,
@@ -369,7 +369,7 @@ factorize_for_plotting <- function(SV.correlations.df){
 }
 SV.metadata.correlations.df <- 
     check_cached_results(
-        results_file=file.path(NOTEBOOK_CACHE_DIR, 'all.SV.metadata.correlations.tsv'),
+        results_file=ALL_SV_METADATA_CORRELATIONS_TSV_FILEPATH,
         force_redo=FORCE_REDO,
         # force_redo=TRUE,
         results_fnc=compute_all_SV_metadata_correlations,
@@ -461,7 +461,7 @@ summarize_peak_variances <- function(
 }
 all.peak.variance.results.df <- 
     check_cached_results(
-        results_file=file.path(NOTEBOOK_CACHE_DIR, 'peak.variance.data.tsv'),
+        results_file=PEAK_VARIANCE_STATS_TSV_FILEPATH,
         force_redo=FORCE_REDO,
         # force_redo=TRUE,
         results_fnc=
@@ -542,7 +542,7 @@ We can see a clear elbow pattern among the SVs, bending around ~5 SVs as with th
 
 varpar.results.df <- 
     check_cached_results(
-        results_file=file.path(NOTEBOOK_CACHE_DIR, 'variancePartition.data.tsv'),
+        results_file=VARIANCE_PARTITION_UNREGRESSED_TSV_FILEPATH,
         force_redo=FORCE_REDO,
         # force_redo=TRUE,
         results_fnc=
@@ -663,7 +663,7 @@ summarize_variancePartition_results <- function(
 }
 all.varpar.results.df <- 
     check_cached_results(
-        results_file=file.path(NOTEBOOK_CACHE_DIR, 'all.SV.variancePartition.data.tsv'),
+        results_file=ALL_SV_REGRESSED_VARIANCE_PARTITION_RESULTS_TSV_FILEPATH,
         force_redo=FORCE_REDO,
         # force_redo=TRUE,
         results_fnc=
@@ -815,7 +815,7 @@ summarize_elbow_results <- function(
 }
 all.elbow.data.df <- 
     check_cached_results(
-        results_file=file.path(NOTEBOOK_CACHE_DIR, 'all.elbow.data.tsv'),
+        results_file=ALL_CRD_SV_ELBOW_RESULTS_TSV_FILEPATH,
         force_redo=FORCE_REDO,
         # force_redo=TRUE,
         results_fnc=

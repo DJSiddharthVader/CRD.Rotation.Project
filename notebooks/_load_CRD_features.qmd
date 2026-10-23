@@ -1,0 +1,30 @@
+Load CRD features + summary stats over OCRs per CRD
+```{r load_CRD_features}
+all.CRD.features.df <- 
+    check_cached_results(
+        results_file=ALL_CRD_STATS_TSV_FILEPATH,
+        force_redo=FORCE_REDO,
+        results_fnc=
+            function() {
+                list_all_results_files_in_set(set.name='CRD.stats') %>% 
+                results_filter_fnc() %>% 
+                mutate(
+                    CRD.stats=
+                        future_pmap(
+                            .l=list(filepath),
+                            .progress=TRUE,
+                            .f=read_tsv,
+                            show_col_types=FALSE
+                        )
+                ) %>%
+                unnest(CRD.stats)
+            }
+    ) %>% 
+    select(
+        CPM.cutoff, residual.model, 
+        # z.score.counts, n.SVs, SVs.included,
+        is.decorate.filtered,
+        AD.definition.column, sample.strategy, meanClusterSize, merging.level, 
+        CRDID, CRD.feature.type, CRD.feature, CRD.value
+    )
+```

@@ -1,29 +1,22 @@
-#############################
+##########################################################
 # Relevant Directories
-#############################
-INPUT_DATA_DIR                   <- here("input.data")
+##########################################################
 # Results Dirs
-SVA_RESULTS_DIR                  <- here("results", "peak.SVs")
-SV_VARIANCEPARTITION_RESULTS_DIR <- here("results", "SV.variancePartitions")
-SV_PEAK_STATS_DIR                <- here("results", "SV.peak.stats")
-CRD_RESULTS_DIR                  <- here("results", "decorate.CRDs")
-MERGED_CRD_RESULTS_DIR           <- here("results", "merged.CRDs")
-DIFFERENTIAL_CRD_RESULTS_DIR     <- here("results", "differential.CRDs")
+SVA_RESULTS_DIR                       <- here("results", "peak.SVs")
+SV_VARIANCEPARTITION_RESULTS_DIR      <- here("results", "SV.variancePartitions")
+SV_PEAK_STATS_DIR                     <- here("results", "SV.peak.stats")
+CRD_RESULTS_DIR                       <- here("results", "decorate.CRDs")
+MERGED_CRD_RESULTS_DIR                <- here("results", "merged.CRDs")
+DIFFERENTIAL_CRD_RESULTS_DIR          <- here("results", "differential.CRDs")
+FUNCTIONAL_ENRICHMENT_CRD_RESULTS_DIR <- here("results", "CRD.functional.enrichment")
+CACHED_COMBINED_RESULTS_DIR           <- here("results", "cached.combined.results")
 
-#############################
+##########################################################
 # Input data
-#############################
-RESIDUALS_DIR <- 
-    here(
-        '..',
-        "Combined_RNAseq_ATACseq",
-        "ATACseq_analyses",
-        "Data_processing",
-        "files"
-    )
+##########################################################
+# From others
+RESIDUALS_DIR  <- here('..', "Combined_RNAseq_ATACseq", "ATACseq_analyses", "Data_processing", "files")
 SAMPLE_METADATA_RDS_FILEPATH  <- file.path(RESIDUALS_DIR, "AllInfo_ATACseq_processing_209x362.RDs")
-SAMPLE_METADATA_TSV_FILEPATH  <- file.path(INPUT_DATA_DIR, "all.sample.metadata.tsv")
-PEAK_METADATA_TSV_FILEPATH    <- file.path(INPUT_DATA_DIR, "all.peak.metadata.tsv")
 DIFFERENTIAL_OCR_RDS_FILEPATH <- 
     here(
         '..',
@@ -34,5 +27,30 @@ DIFFERENTIAL_OCR_RDS_FILEPATH <-
         "DEG_results",
         "CombinedDEGresult_GCv38_ATACseq_over45y_3CPM_List_08_20_26.RDs"
     )
+# My pre-processed versions
+INPUT_DATA_DIR                <- here("input.data")
+SAMPLE_METADATA_TSV_FILEPATH  <- file.path(INPUT_DATA_DIR, "all.sample.metadata.tsv")
+PEAK_METADATA_TSV_FILEPATH    <- file.path(INPUT_DATA_DIR, "all.peak.metadata.tsv")
 DIFFERENTIAL_OCR_TSV_FILEPATH <- file.path(INPUT_DATA_DIR, 'differential.OCR.results.tsv')
-ALL_CRD_STATS_TSV_FILEPATH <- here('results', 'all.CRD.stats.tsv')
+
+##########################################################
+# Coallated results, mostly used in notebooks
+##########################################################
+ALL_SVS_RDS_FILEPATH <- 
+    file.path(CACHED_COMBINED_RESULTS_DIR, 'all.SV.data.rds')
+ALL_SV_CORRELATIONS_TSV_FILEPATH <- 
+    file.path(CACHED_COMBINED_RESULTS_DIR, 'all.SV.data.tsv')
+ALL_SV_METADATA_CORRELATIONS_TSV_FILEPATH <- 
+    file.path(CACHED_COMBINED_RESULTS_DIR, 'all.SV.metadata.correlations.tsv')
+PEAK_VARIANCE_STATS_TSV_FILEPATH <- 
+    file.path(CACHED_COMBINED_RESULTS_DIR, 'peak.variance.data.tsv')
+VARIANCE_PARTITION_UNREGRESSED_TSV_FILEPATH <- 
+    file.path(CACHED_COMBINED_RESULTS_DIR, 'variancePartition.data.tsv')
+ALL_SV_REGRESSED_VARIANCE_PARTITION_RESULTS_TSV_FILEPATH <- 
+    file.path(CACHED_COMBINED_RESULTS_DIR, 'all.SV.variancePartition.data.tsv')
+ALL_CRD_SV_ELBOW_RESULTS_TSV_FILEPATH <- 
+    file.path(CACHED_COMBINED_RESULTS_DIR, 'all.elbow.data.tsv')
+ALL_CRD_STATS_TSV_FILEPATH <- 
+    file.path(CACHED_COMBINED_RESULTS_DIR, 'all.CRD.stats.tsv')
+ALL_CRD_DIFFERENTIAL_STATS_TSV_FILEPATH <- 
+    file.path(CACHED_COMBINED_RESULTS_DIR, 'all.differential.CRD.stats.tsv')

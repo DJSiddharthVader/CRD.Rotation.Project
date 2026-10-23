@@ -1,0 +1,55 @@
+Load differential CRD statistics
+```{r load_all_differential_stats}
+all.differential.CRD.results.df <- 
+    check_cached_results(
+        results_file=ALL_CRD_DIFFERENTIAL_STATS_TSV_FILEPATH,
+        force_redo=FORCE_REDO,
+        # force_redo=TRUE,
+        results_fnc=
+            function() {
+                list_all_results_files_in_set(set.name='CRD.differential.stats') %>%
+                mutate(
+                    diff.stats=
+                        future_pmap(
+                            .l=list(filepath),
+                            .f=read_tsv,
+                            show_col_types=FALSE,
+                            .progress=TRUE
+                        )
+                ) %>%
+                unnest(diff.stats) %>%
+                filter(nPeaks >= 5) %>% 
+                # count CRDs per pre-merged origin grouping
+                group_by(
+                    CPM.cutoff, residual.model, CRD.sample.strategy,
+                    z.score.counts, n.SVs, SVs.included,
+                    meanClusterSize, is.decorate.filtered,
+                    contrast, method,
+                    detected.in.groups
+                ) %>% 
+                mutate(nCRDs=length(unique(CRDID))) %>%
+                ungroup(detected.in.groups) %>% 
+                mutate(
+                    log10.p.value=-log10(p.value),
+                    p.adjust=p.adjust(p.value, method='BH'),
+                    log10.p.adjust=-log10(p.adjust)
+                ) %>% 
+                ungroup()
+            }
+    ) %>% 
+    filter(
+        contrast %in% 
+            c(
+                "sex-Male-Female",
+                # "Biobank-Rush-MSBB",
+                # "Braak_3levels-Braak_5plus-Braak_Max2",
+                "Braak_3levels-Braak_5plus-Braak_3to4",
+                "CDR_3levels-Dementia-Healthy",
+                "age-NA-NA",
+                "AD_CERAD_withDLB-AD-Control"
+            )
+    ) %>% 
+    filter(!is.na(p.value)) %>% 
+    select(-c(count, filepath))
+```
+

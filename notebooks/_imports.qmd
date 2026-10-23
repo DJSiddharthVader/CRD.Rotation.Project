@@ -1,4 +1,4 @@
-<!-- Set notebook options -->
+Set notebook options
 ```{r knitr_options}
 #| context: setup
 #| include: false
@@ -12,7 +12,7 @@ knitr::opts_chunk$set(
     dpi=300
 )
 ```
-<!-- Load dependencies -->
+Load dependencies
 ```{r load_basic_dependencies}
 #| context: setup
 #| include: false
@@ -22,6 +22,6 @@ source(here('scripts', 'basic.imports.R'))
 source(here('scripts', 'utils.plot.R'))
 library(variancePartition) # for canCorPairs
 plan(multisession, workers=TOTAL_CORES)
-NOTEBOOK_CACHE_DIR <- here('results', 'notebook.cache', params$cache.dir.name)
+# NOTEBOOK_CACHE_DIR <- here('results', 'notebook.cache', params$cache.dir.name)
 ```
 
