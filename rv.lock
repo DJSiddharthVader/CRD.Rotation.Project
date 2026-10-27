@@ -2701,6 +2701,15 @@ dependencies = [
 ]
 
 [[packages]]
+name = "stageR"
+version = "1.32.0"
+source = { repository = "https://bioconductor.org/packages/3.22/bioc" }
+force_source = false
+dependencies = [
+    "SummarizedExperiment",
+]
+
+[[packages]]
 name = "statmod"
 version = "1.5.2"
 source = { repository = "https://packagemanager.posit.co/cran/latest" }

@@ -60,4 +60,5 @@ dependencies = [
     "plyranges",
     "ggExtra",
     "ggside",
+    "stageR",
 ]
