@@ -275,7 +275,6 @@ CRD.counts.df %>%
 For all merged CRDs show what types of CRDs were merged to create them.
 
 ```{r plot_CRD_merge_origins, results='asis'}
-#| eval: false
 #| echo: false
 #| fig-height: 6
 #| fig-width: 10 
@@ -408,7 +407,6 @@ make_pairplot <- function(
 
 Plot distirbution of CRD features across all CRDs, compare distributions
 ```{r plot_all_CRD_stats, results='asis'}
-#| echo: false
 #| fig-width: 8
 #| fig-height: 8
 #| eval: false
@@ -467,7 +465,6 @@ OCR.summary.stats.df %>%
 #| echo: false
 #| fig-height: 8
 #| fig-width: 10
-#| eval: false
 
 # #| eval: false
 # Now plot correlation of SVs across datasets
@@ -810,8 +807,6 @@ OCR.summary.stats.df %>%
     filter(meanClusterSize == 'merged') %>% 
     filter(sample.strategy == 'merged') %>% 
     add_merge_origin_annotations() %>% 
-    mutate(detected.in.groups=str_remove_all(detected.in.groups, '.Samples')) %>% 
-    add_merge_origin_annotations() %>%
     inner_join(
         tribble(
             ~feature,              ~feature.name,             
@@ -827,6 +822,7 @@ OCR.summary.stats.df %>%
     ) %>% 
     select(-c(feature, CRD.feature.type, summary.stat)) %>% 
     order_variable_for_plotting() %>% 
+    mutate(detected.in.groups=str_remove_all(detected.in.groups, '.Samples')) %>% 
     nest(plot.df=-all_of(c(nesting.vars))) %>% 
     mutate(
         figures=
@@ -917,7 +913,6 @@ nesting.vars <-
 # all.differential.CRD.results.df %>% colnames()
 # all.differential.CRD.results.df %>% count(CRD.sample.strategy, contrast, method)
 all.differential.CRD.results.df %>% 
-    mutate(detected.in.groups=str_remove_all(detected.in.groups, '.Samples')) %>% 
     filter(CRD.sample.strategy == 'merged') %>% 
     pivot_longer(
         c(p.adjust, p.value, log10.p.adjust, log10.p.value),
@@ -934,6 +929,7 @@ all.differential.CRD.results.df %>%
             )
     ) %>% 
     order_variable_for_plotting() %>% 
+    mutate(detected.in.groups=str_remove_all(detected.in.groups, '.Samples')) %>% 
     nest(plot.df=-all_of(c(nesting.vars))) %>% 
     mutate(
         figures=
@@ -1035,6 +1031,4 @@ plot.df %>%
         tabset_vars=nesting.vars
     )
 ```
-
-
 

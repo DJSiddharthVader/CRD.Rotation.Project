@@ -406,7 +406,94 @@ all.merged.CRDs.df %>%
     )
 ```
 
+# Plot features distributions for AD-specific, Control-specific and Shared CRDs
+
+Now for the specific case of merging CRDs across sample sets, plot CRD features stratified by the source of the CRDs that were merged to create the merged CRDs.
+
+```{r stratify_stats_by_merged_CRD_source}
+# Now get all CRD features, mapp to original sample sets -> plot stratified by sample set origin
+stratitied.merged.CRDs.df <- 
+    list(
+        'CRD.stats'=
+            all.CRD.differential.stats.df %>%
+            # filter(CRD.feature %in% c()) %>% 
+            nest(stats=c(CRDID, CRD.feature, CRD.value)),
+        'OCR.summary.stats'=
+            OCR.summary.stats.df %>% 
+            nest(stats=c(CRDID, metric, summary.stat, CRD.value)),
+        'OCR.differential.stats'=
+            all.CRD.differential.stats.df %>% 
+            nest(stats=c(CRDID, contrast, metric, summary.stat, CRD.value))
+    ) %>% 
+    bind_rows() %>% 
+    pivot_wider(
+        names_from=CRD.feature.type,
+        values_from=stats
+    ) %>% 
+    inner_join(
+        all.merged.CRDs.df %>% 
+        nest(CRD.annotations=c(CRDID, detected.in.groups)),
+        by=
+            join_by(
+                CPM.cutoff, residual.model, AD.definition.column, 
+                sample.strategy, meanClusterSize, merging.level,
+                # z.score.counts, n.SVs, SVs.included,
+                is.decorate.filtered
+            )
+    ) %>% 
+        {.} -> tmp2; tmp2
+tmp2 %>% head(1) %>% t()
+tmp2$peak.summary.stats[[1]]
+tmp2$peak.differential.stats[[1]]
+tmp2$CRD.annotations[[1]]
+    tmp2$peak.summary.stats[[1]] %>% nest(stats=-c(CRDID))
+    tmp2$peak.differential.stats[[1]] %>% nest(stats=-c(CRDID, contrast))
+inner_join(
+    tmp2$peak.summary.stats[[1]] %>% nest(stats=-c(CRDID)),
+    tmp2$peak.differential.stats[[1]] %>% nest(stats=-c(CRDID, contrast)),
+    by='CRDID'
+)
 ```
 
-# Define AD/Control-specific CRDs and plot features
+```{r plot_stratified_CRDs, results='asis'}
+#| eval: false
+#| echo: false
+#| fig-height: 7
+#| fig-width: 10
+
+nesting.vars <- 
+    c(
+        'CPM.cutoff',
+        'residual.model'
+        # 'contrast'
+        # 'CRD.feature.type'
+        # 'AD.definition.column',
+    )
+stratitied.merged.CRDs.df %>% 
+    nest(plot.df=-all_of(c(nesting.vars))) %>% 
+    mutate(
+        figures=
+            pmap(
+                .l=.,
+                .f=plot_boxplot,
+                x.var='detected.in.groups',
+                y.var='CRD.value',
+                # facet.col=c('CRD.feature.type', 'CRD.feature'),
+                facet.group=c('CRD.feature'), facet.nrow=2,
+                fill.var='detected.in.groups',
+                y.axis.label.accuracy='0.01',
+                legend.position='none',
+                # scales='free_y', independent='y',
+                scales='free', space='free', independent='all',
+                axis.text.x=element_text(angle=45, vjust=-1, hjust=1),
+                axis.title=element_blank(),
+                .progress=TRUE
+            )
+    ) %>% 
+    custom_render_tabset(
+        starting.hlevel=2,
+        output_var='figures',
+        tabset_vars=nesting.vars
+    )
+```
 
