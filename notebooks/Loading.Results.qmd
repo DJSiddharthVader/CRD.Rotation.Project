@@ -1,0 +1,234 @@
+---
+title: "How to Load CRD results" 
+date: "`r Sys.Date()`"
+metadata-files:
+  - _report_options.yml
+---
+
+{{< include _imports.qmd >}}
+
+```{r notebook opts}
+FORCE_REDO <- FALSE
+# FORCE_REDO <- TRUE
+results_filter_fnc <- function(df) {
+    df %>% 
+    filter(CPM.cutoff == '3CPM') %>% 
+    filter(z.score.counts) %>% 
+    filter(n.SVs == NUM_SVS_TO_GENERATE) %>% 
+    filter(SVs.included == NUM_SVS_TO_REMOVE)
+}
+```
+
+## Load Input data to generate CRDs
+
+```{r load_sample_metadata}
+# load sample metadata
+all.sample.metadata <- 
+    load_sample_metadata()
+```
+
+```{r load_peak_residuals}
+# ATAC data
+all.ATAC.and.SV.datasets.df <- 
+    list_all_ATAC_datasets() %>% 
+    # which sets of samples to use to call CRDs
+    cross_join(RESIDUAL_MATRIX_SAMPLE_PARAMS_DF) %>% 
+    # map files with estimated SVs to the corresponding residual matrices
+    inner_join(
+        list_all_results_files_in_set(set.name='SVs'),
+        by=
+            join_by(
+                CPM.cutoff,
+                residual.model,
+                AD.definition.column,
+                sample.strategy
+            )
+    ) %>% 
+    filter(sample.strategy %in% c('All.Samples')) %>%
+    select(-c(AD.definition.column, sample.strategy))
+```
+
+## Regress out SVs from Peak Residuals
+
+## Load CRD features + summary stats over OCRs per CRD
+
+First load all different CRD-level features across all sets of estimated CRDs
+```{r load_all_CRD_features}
+all.CRD.features.df <- 
+    check_cached_results(
+        results_file=ALL_CRD_STATS_TSV_FILEPATH,
+        force_redo=FORCE_REDO,
+        results_fnc=
+            function() {
+                list_all_results_files_in_set(set.name='CRD.stats') %>% 
+                results_filter_fnc() %>% 
+                mutate(
+                    CRD.stats=
+                        future_pmap(
+                            .l=list(filepath),
+                            .progress=TRUE,
+                            .f=read_tsv,
+                            show_col_types=FALSE
+                        )
+                ) %>%
+                unnest(CRD.stats)
+            }
+    ) %>% 
+    select(
+        CPM.cutoff, residual.model, 
+        # z.score.counts, n.SVs, SVs.included,
+        is.decorate.filtered,
+        AD.definition.column, sample.strategy, meanClusterSize, merging.level, 
+        CRDID, CRD.feature.type, CRD.feature, CRD.value
+    )
+```
+
+### Count how many CRDs + total peaks there are in total
+
+Summarize CRD-level feature to get genome-wide totals
+```{r make_CRD_counts_data}
+stat.vars <- 
+    c(
+        "CRD.length",
+        "CRD.nPeaks",
+        'peak.length-total'
+    )
+CRD.counts.df <- 
+    all.CRD.features.df %>%
+    filter(CRD.feature %in% stat.vars) %>% 
+    select(-c(CRD.feature.type)) %>% 
+    pivot_wider(names_from=CRD.feature, values_from=CRD.value) %>% 
+    group_by(across(-all_of(c('CRDID', stat.vars)))) %>% 
+    summarize(
+        .groups='drop',
+        nCRDs=dplyr::n(),
+        CRD.length=sum(CRD.length),
+        CRD.nPeaks=sum(CRD.nPeaks),
+        `peak.length-total`=sum(`peak.length-total`)
+    ) %>%
+    mutate(
+        CRD.density=1e6 * CRD.nPeaks / CRD.length,
+        CRD.peak.coverage=100 * `peak.length-total` / CRD.length
+    )
+```
+
+### For all merged CRDs, get features for each CRD
+
+From the full set of features, get the OCR-level summary statistic for each OCR feature
+```{r get_OCR_feature_summaries_per_CRD}
+OCR.summary.stats.df <- 
+    all.CRD.features.df %>% 
+    filter(CRD.feature.type %in% c('CRD.stats', 'peak.summary.stats')) %>%
+    separate_wider_delim(
+        CRD.feature,
+        delim='-',
+        names=c('feature', 'summary.stat'),
+        # too_few='align_end'
+        too_few='align_start'
+    ) %>%
+    mutate(summary.stat=ifelse(is.na(summary.stat), 'Size', summary.stat)) %>% 
+    # mutate(feature=ifelse(is.na(feature), 'Size', feature)) %>% 
+    filter(summary.stat != 'sd')
+```
+
+### For all merged CRDs, load OCR-level summary stats of differentila stats (logFC + p.value)
+
+From the full set of features, get the OCR-level summary statistic for the indival OCR diffferential statistics computed by Roman.
+```{r get_OCR_differential_summaries_per_CRD}
+all.CRD.differential.stats.df <-
+    all.CRD.features.df %>% 
+    filter(meanClusterSize == 'merged') %>% 
+    filter(CRD.feature.type == 'peak.differential.stats') %>% 
+    separate_wider_delim(
+        CRD.feature,
+        delim='-',
+        names=c('contrast', 'metric', 'summary.stat')
+    ) %>%
+    filter(summary.stat != 'sd')
+```
+
+## Load all merged CRDs
+
+```{r load_merged_CRDs}
+all.merged.CRDs.df <- 
+    list_all_results_files_in_set(set.name='merged.CRDs') %>% 
+    results_filter_fnc() %>% 
+    mutate(
+        CRDs=
+            future_pmap(
+                .l=.,
+                .f=combine_CRD_Locations_and_PeakLists,
+                .progress=TRUE
+            )
+    ) %>% 
+    unnest(CRDs) %>% 
+    select(
+        CPM.cutoff, residual.model, AD.definition.column,
+        z.score.counts, n.SVs, SVs.included,
+        sample.strategy, meanClusterSize, merging.level,
+        is.decorate.filtered,
+        CRDID, detected.in.groups
+    )
+```
+
+### Merged CRDs across meanClusterSizes
+
+### Merged CRDs across sample-sets (label CRDs as AD-specific/Control-specific/Shared)
+
+## Decorate differential CRD statistics
+
+Load differential CRD statistics
+```{r load_all_differential_stats}
+all.differential.CRD.results.df <- 
+    check_cached_results(
+        results_file=ALL_CRD_DIFFERENTIAL_STATS_TSV_FILEPATH,
+        force_redo=FORCE_REDO,
+        # force_redo=TRUE,
+        results_fnc=
+            function() {
+                mutate(
+                list_all_results_files_in_set(set.name='CRD.differential.stats') %>%
+                    diff.stats=
+                        future_pmap(
+                            .l=list(filepath),
+                            .f=read_tsv,
+                            show_col_types=FALSE,
+                            .progress=TRUE
+                        )
+                ) %>%
+                unnest(diff.stats) %>%
+                filter(nPeaks >= 5) %>% 
+                # count CRDs per pre-merged origin grouping
+                group_by(
+                    CPM.cutoff, residual.model, CRD.sample.strategy,
+                    z.score.counts, n.SVs, SVs.included,
+                    meanClusterSize, is.decorate.filtered,
+                    contrast, method,
+                    detected.in.groups
+                ) %>% 
+                mutate(nCRDs=length(unique(CRDID))) %>%
+                ungroup(detected.in.groups) %>% 
+                mutate(
+                    log10.p.value=-log10(p.value),
+                    p.adjust=p.adjust(p.value, method='BH'),
+                    log10.p.adjust=-log10(p.adjust)
+                ) %>% 
+                ungroup()
+            }
+    ) %>% 
+    filter(
+        contrast %in% 
+            c(
+                "sex-Male-Female",
+                # "Biobank-Rush-MSBB",
+                # "Braak_3levels-Braak_5plus-Braak_Max2",
+                "Braak_3levels-Braak_5plus-Braak_3to4",
+                "CDR_3levels-Dementia-Healthy",
+                "age-NA-NA",
+                "AD_CERAD_withDLB-AD-Control"
+            )
+    ) %>% 
+    filter(!is.na(p.value)) %>% 
+    select(-c(count, filepath))
+```
+
