@@ -9,9 +9,10 @@ Roussos Lab Fall 2026 Rotation Project
 
 Here are all the compiled quarto notebooks detailing my results
 
-1. [SV Results](./compiled.notebooks/01_Surrogate.Variable.Analysis.html)
-1. [CRD Merging + Annotation](./compiled.notebooks/02_CRD.Investigation.html)
-1. [Differential CRDs](./compiled.notebooks/03_Differential.CRD.Analysis.html)
+1. [Loading Results](./notebooks/Loading.Results.html)
+1. [SV Results](./notebooks/01_Surrogate.Variable.Analysis.html)
+1. [CRD Merging + Annotation](./02_CRD.Investigation.html)
+1. [Differential CRDs](./notebooks/FINAL_Presentation.figures.html)
 
 ## Reproducibility
 
