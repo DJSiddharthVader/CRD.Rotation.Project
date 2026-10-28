@@ -506,7 +506,7 @@ list_all_results_files_in_set <- function(
     # List all LEFs results extracted from blobs after iteratively regressing out SVs
     } else if (set.name == 'SVs.elbow') {
         CRD_RESULTS_DIR %>% 
-        parse_results_filelist(suffix='decorate.CRD.LEFs.tsv') %>% 
+        parse_results_filelist(suffix='decorate.CRDs.LEFs.tsv') %>% 
         dplyr::rename('elbow.filepath'=filepath) %>% 
         select(-c(filename))
     # List all CRD objects with clusters + filtered clusters + LEFs

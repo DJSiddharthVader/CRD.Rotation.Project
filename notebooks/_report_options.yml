@@ -1,8 +1,8 @@
 author: "Siddharth Reed"
-keep-md: true
 lightbox: true
 format:
     html:
+        df-print: paged
         embed-resources: true
         page-layout: full
         toc: true
